@@ -28,13 +28,13 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // For demo purposes, also accept plain "admin123" password
+    // For demo purposes, also accept plain "admin123" password for admin user
     let isValidPassword = false;
     if (password === 'admin123' && username === 'admin') {
       isValidPassword = true;
     } else {
-      // Check hashed password
-      isValidPassword = await bcrypt.compare(password, user.password);
+      // Check hashed password - use password_hash column
+      isValidPassword = await bcrypt.compare(password, user.password_hash);
     }
 
     if (!isValidPassword) {
@@ -43,7 +43,7 @@ router.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -54,7 +54,8 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
 
@@ -112,8 +113,8 @@ router.post('/change-password', authenticateToken, async (req, res) => {
 
     const user = result.rows[0];
 
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    // Verify current password - use password_hash column
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
@@ -121,9 +122,9 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password
+    // Update password - use password_hash column
     await db.query(
-      'UPDATE users SET password = $1 WHERE id = $2',
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
       [hashedPassword, userId]
     );
 
