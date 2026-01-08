@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - Trackisto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #ffffff;
+            color: #333;
+        }
+
+        /* Header */
+        .header {
+            background: #0d234b;
+            padding: 16px 24px;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            color: #00a0d6;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: #00a0d6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: #00a0d6;
+        }
+
+        /* Hero */
+        .hero {
+            background: linear-gradient(135deg, #00a0d6 0%, #0d234b 100%);
+            color: white;
+            padding: 80px 24px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        /* Content */
+        .container {
+            max-width: 1200px;
+            margin: -40px auto 60px;
+            padding: 0 24px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .content-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 50px;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            margin-bottom: 50px;
+        }
+
+        .contact-method {
+            padding: 36px;
+            background: #f0f8fc;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .contact-method:hover {
+            border-color: #00a0d6;
+            transform: translateY(-4px);
+        }
+
+        .contact-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .contact-icon svg {
+            width: 48px;
+            height: 48px;
+            fill: #00a0d6;
+        }
+
+        .contact-method h3 {
+            font-size: 20px;
+            color: #0d234b;
+            margin-bottom: 12px;
+        }
+
+        .contact-method p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            font-size: 15px;
+        }
+
+        .contact-method a {
+            color: #00a0d6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .contact-method a:hover {
+            text-decoration: underline;
+        }
+
+        .contact-method span {
+            color: #666;
+            font-size: 15px;
+        }
+
+        .section-title {
+            font-size: 28px;
+            color: #0d234b;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .contact-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: #0d234b;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #00a0d6;
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: #00a0d6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .submit-btn:hover {
+            background: #0088b8;
+        }
+
+        .form-note {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        /* Footer */
+        .footer {
+            background: #0d234b;
+            color: white;
+            padding: 60px 24px 30px;
+            margin-top: 80px;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 60px;
+        }
+
+        .footer h4 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #00a0d6;
+        }
+
+        .footer p {
+            color: rgba(255,255,255,0.8);
+            font-size: 15px;
+            line-height: 1.8;
+        }
+
+        .footer a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            font-size: 15px;
+            display: block;
+            margin-bottom: 12px;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: #00a0d6;
+        }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 40px auto 0;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .contact-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                </div>
+                trackisto
+            </a>
+            <nav class="nav-links">
+                <a href="index.html">Track & Trace</a>
+                <a href="about.html">About Us</a>
+                <a href="faq.html">FAQ</a>
+                <a href="contact.html">Contact</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Contact Us</h1>
+        <p>We're here to help. Get in touch with our support team.</p>
+    </section>
+
+    <!-- Content -->
+    <div class="container">
+        <div class="content-card">
+            <div class="contact-grid">
+                <div class="contact-method">
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    </div>
+                    <h3>Email Support</h3>
+                    <p>Our team typically responds within 24 hours</p>
+                    <a href="mailto:support@trackisto.com">support@trackisto.com</a>
+                </div>
+
+                <div class="contact-method">
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                    </div>
+                    <h3>Business Hours</h3>
+                    <p>We're available during regular business hours</p>
+                    <span>Mon-Fri: 9:00-17:00 CET</span>
+                </div>
+
+                <div class="contact-method">
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+                    </div>
+                    <h3>Response Time</h3>
+                    <p>Average response time for all inquiries</p>
+                    <span>Within 24 hours</span>
+                </div>
+            </div>
+
+            <h2 class="section-title">Send Us a Message</h2>
+
+            <form class="contact-form" id="contactForm">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" required placeholder="Your name">
+                </div>
+
+                <div class="form-group">
+                    <label>Email Address *</label>
+                    <input type="email" required placeholder="your@email.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Subject</label>
+                    <select>
+                        <option value="">Select a topic</option>
+                        <option value="tracking">Tracking Issue</option>
+                        <option value="delivery">Delivery Problem</option>
+                        <option value="general">General Inquiry</option>
+                        <option value="feedback">Feedback</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Tracking Number (Optional)</label>
+                    <input type="text" placeholder="e.g. GB2235047529408">
+                </div>
+
+                <div class="form-group">
+                    <label>Message *</label>
+                    <textarea required placeholder="How can we help you?"></textarea>
+                </div>
+
+                <button type="submit" class="submit-btn">Send Message</button>
+
+                <p class="form-note">We'll get back to you within 24 hours</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div>
+                <h4>Trackisto</h4>
+                <p>Professional parcel tracking solutions for businesses and individuals. Real-time updates, reliable service, delivered with excellence.</p>
+            </div>
+            <div>
+                <h4>Quick Links</h4>
+                <a href="index.html">Track & Trace</a>
+                <a href="about.html">About Us</a>
+                <a href="faq.html">FAQ</a>
+                <a href="contact.html">Contact Us</a>
+            </div>
+            <div>
+                <h4>Contact</h4>
+                <p>support@trackisto.com</p>
+                <p>Mon-Fri: 8:00-17:00</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            © 2025 Trackisto. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('contactForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('Thank you for your message! We will get back to you within 24 hours.');
+            this.reset();
+        });
+    </script>
+</body>
+</html>
