@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://trackisto-backend.onrender.com';
@@ -8,11 +7,42 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [shipments, setShipments] = useState([]);
-  const [stats, setStats] = useState({ totalShipments: 0, todayShipments: 0, pendingOrders: 0 });
+  const [stores, setStores] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    total: 0,
+    today: 0,
+    pending: 0
+  });
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [showAddStore, setShowAddStore] = useState(false);
+  const [editingStore, setEditingStore] = useState(null);
+  const [storeForm, setStoreForm] = useState({
+    domain: '',
+    api_token: '',
+    delivery_days: 7,
+    send_offset: 0,
+    country_origin: 'United Kingdom',
+    transit_country: '',
+    post_delivery_event: 'None',
+    sorting_days: 3,
+    parcel_point: true,
+    parcel_point_days: 3,
+    redelivery_active: false,
+    redelivery_days: 3,
+    attempts: 1
+  });
+  const [pasteUrl, setPasteUrl] = useState('');
+
+  const countries = [
+    'United Kingdom', 'Germany', 'Netherlands', 'Denmark', 'France', 
+    'Belgium', 'Italy', 'Spain', 'Poland', 'Sweden', 'Norway',
+    'Austria', 'Switzerland', 'Ireland', 'Portugal', 'Czech Republic',
+    'Finland', 'Greece', 'Hungary', 'Romania', 'United States', 'Canada'
+  ];
+
+  const postDeliveryEvents = ['None', 'Survey Email', 'Review Request', 'Thank You Email'];
 
   useEffect(() => {
     if (token) {
@@ -21,22 +51,60 @@ function App() {
     }
   }, [token]);
 
+  const fetchDashboardData = async () => {
+    try {
+      const [statsRes, shipmentsRes, storesRes] = await Promise.all([
+        fetch(`${API_URL}/api/shipments/stats/dashboard`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/shipments`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/shopify/stores`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        setDashboardStats(stats);
+      }
+
+      if (shipmentsRes.ok) {
+        const data = await shipmentsRes.json();
+        setShipments(data.shipments || []);
+      }
+
+      if (storesRes.ok) {
+        const data = await storesRes.json();
+        setStores(data.stores || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
-        username,
-        password
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm)
       });
-      
-      const { token: newToken } = response.data;
-      localStorage.setItem('token', newToken);
-      setToken(newToken);
-      setIsLoggedIn(true);
-      fetchDashboardData();
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        setIsLoggedIn(true);
+      } else {
+        alert('Login failed: ' + data.message);
+      }
     } catch (error) {
-      alert('Login failed: ' + (error.response?.data?.error || 'Invalid credentials'));
+      alert('Login failed: ' + error.message);
     }
     setLoading(false);
   };
@@ -45,501 +113,534 @@ function App() {
     localStorage.removeItem('token');
     setToken(null);
     setIsLoggedIn(false);
-    setUsername('');
-    setPassword('');
+    setCurrentPage('dashboard');
   };
 
-  const fetchDashboardData = async () => {
-    try {
-      const [shipmentsRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/shipments`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/api/shipments/stats/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-      
-      setShipments(shipmentsRes.data.shipments || []);
-      setStats(statsRes.data);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+  const extractDomainFromUrl = (url) => {
+    // Extract domain from Shopify admin URL like https://admin.shopify.com/store/your-store/...
+    const match = url.match(/admin\.shopify\.com\/store\/([^\/]+)/);
+    if (match) {
+      return `${match[1]}.myshopify.com`;
+    }
+    // Also handle direct myshopify.com URLs
+    const directMatch = url.match(/([^\/]+\.myshopify\.com)/);
+    if (directMatch) {
+      return directMatch[1];
+    }
+    return '';
+  };
+
+  const handleConvertUrl = () => {
+    const domain = extractDomainFromUrl(pasteUrl);
+    if (domain) {
+      setStoreForm({ ...storeForm, domain });
+      setPasteUrl('');
+    } else {
+      alert('Could not extract domain from URL. Please enter it manually.');
     }
   };
 
-  const handleCreateShipment = async (formData) => {
+  const resetStoreForm = () => {
+    setStoreForm({
+      domain: '',
+      api_token: '',
+      delivery_days: 7,
+      send_offset: 0,
+      country_origin: 'United Kingdom',
+      transit_country: '',
+      post_delivery_event: 'None',
+      sorting_days: 3,
+      parcel_point: true,
+      parcel_point_days: 3,
+      redelivery_active: false,
+      redelivery_days: 3,
+      attempts: 1
+    });
+    setEditingStore(null);
+  };
+
+  const handleAddStore = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/shipments`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
+      const url = editingStore 
+        ? `${API_URL}/api/shopify/stores/${editingStore.id}`
+        : `${API_URL}/api/shopify/stores`;
+      
+      const response = await fetch(url, {
+        method: editingStore ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(storeForm)
       });
-      
-      alert(`Shipment created! Tracking number: ${response.data.trackingNumber}`);
-      fetchDashboardData();
-      setCurrentPage('dashboard');
-    } catch (error) {
-      alert('Error creating shipment: ' + (error.response?.data?.error || 'Unknown error'));
-    }
-  };
 
-  const handleDeleteShipment = async (id) => {
-    if (window.confirm('Are you sure you want to delete this shipment?')) {
-      try {
-        await axios.delete(`${API_URL}/api/shipments/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        alert('Shipment deleted successfully');
+      if (response.ok) {
         fetchDashboardData();
-      } catch (error) {
-        alert('Error deleting shipment: ' + (error.response?.data?.error || 'Unknown error'));
+        setShowAddStore(false);
+        resetStoreForm();
+      } else {
+        const data = await response.json();
+        alert('Failed to save store: ' + data.message);
       }
+    } catch (error) {
+      alert('Failed to save store: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const handleEditStore = (store) => {
+    setStoreForm({
+      domain: store.domain || '',
+      api_token: store.api_token || '',
+      delivery_days: store.delivery_days || 7,
+      send_offset: store.send_offset || 0,
+      country_origin: store.country_origin || 'United Kingdom',
+      transit_country: store.transit_country || '',
+      post_delivery_event: store.post_delivery_event || 'None',
+      sorting_days: store.sorting_days || 3,
+      parcel_point: store.parcel_point !== false,
+      parcel_point_days: store.parcel_point_days || 3,
+      redelivery_active: store.redelivery_active || false,
+      redelivery_days: store.redelivery_days || 3,
+      attempts: store.attempts || 1
+    });
+    setEditingStore(store);
+    setShowAddStore(true);
+  };
+
+  const handleDeleteStore = async (storeId) => {
+    if (!window.confirm('Are you sure you want to delete this store?')) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/shopify/stores/${storeId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        fetchDashboardData();
+      } else {
+        alert('Failed to delete store');
+      }
+    } catch (error) {
+      alert('Failed to delete store: ' + error.message);
     }
   };
 
+  const toggleStoreStatus = async (store) => {
+    try {
+      const newStatus = store.status === 'active' ? 'inactive' : 'active';
+      const response = await fetch(`${API_URL}/api/shopify/stores/${store.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        fetchDashboardData();
+      }
+    } catch (error) {
+      console.error('Failed to toggle store status:', error);
+    }
+  };
+
+  // Login Screen
   if (!isLoggedIn) {
-    return <LoginPage username={username} setUsername={setUsername} password={password} setPassword={setPassword} handleLogin={handleLogin} loading={loading} />;
+    return (
+      <div className="login-container">
+        <div className="login-box">
+          <h1>📦 Trackisto</h1>
+          <p>Admin Dashboard</p>
+          <form onSubmit={handleLogin}>
+            <div className="form-group">
+              <label>Username</label>
+              <input
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                required
+              />
+            </div>
+            <button type="submit" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+          <p className="hint">Default: admin / admin123</p>
+        </div>
+      </div>
+    );
   }
 
+  // Main Dashboard
   return (
     <div className="app">
-      <nav className="navbar">
-        <div className="navbar-brand">
-          <h1>📦 Trackisto Admin</h1>
+      <nav className="sidebar">
+        <div className="logo">
+          <h2>📦 Trackisto</h2>
         </div>
-        <div className="navbar-user">
-          <span>Logged in as: <strong>admin</strong></span>
-          <button onClick={handleLogout} className="btn btn-danger">Logout</button>
+        <div className="nav-title">Navigation</div>
+        <ul className="nav-menu">
+          <li 
+            className={currentPage === 'dashboard' ? 'active' : ''}
+            onClick={() => setCurrentPage('dashboard')}
+          >
+            📊 Dashboard
+          </li>
+          <li 
+            className={currentPage === 'shipments' ? 'active' : ''}
+            onClick={() => setCurrentPage('shipments')}
+          >
+            📦 Manual Entry
+          </li>
+          <li 
+            className={currentPage === 'missing' ? 'active' : ''}
+            onClick={() => setCurrentPage('missing')}
+          >
+            ⏳ Missing Entries
+          </li>
+          <li 
+            className={currentPage === 'shopify' ? 'active' : ''}
+            onClick={() => setCurrentPage('shopify')}
+          >
+            🛒 Shopify Settings
+          </li>
+        </ul>
+        <div className="nav-bottom">
+          <div className="nav-item" onClick={() => setCurrentPage('api')}>
+            📖 API Guide
+          </div>
+          <div className="user-info">
+            Logged in as <strong>admin</strong>
+            <button className="logout-btn" onClick={handleLogout}>Logout</button>
+          </div>
         </div>
       </nav>
 
-      <div className="main-container">
-        <aside className="sidebar">
-          <button className={currentPage === 'dashboard' ? 'active' : ''} onClick={() => setCurrentPage('dashboard')}>
-            📊 Dashboard
-          </button>
-          <button className={currentPage === 'manual-entry' ? 'active' : ''} onClick={() => setCurrentPage('manual-entry')}>
-            ✏️ Manual Entry
-          </button>
-          <button className={currentPage === 'shopify' ? 'active' : ''} onClick={() => setCurrentPage('shopify')}>
-            🛍️ Shopify Settings
-          </button>
-          <button className={currentPage === 'api-guide' ? 'active' : ''} onClick={() => setCurrentPage('api-guide')}>
-            📖 API Guide
-          </button>
-        </aside>
-
-        <main className="content">
-          {currentPage === 'dashboard' && (
-            <Dashboard stats={stats} shipments={shipments} onDelete={handleDeleteShipment} />
-          )}
-          {currentPage === 'manual-entry' && (
-            <ManualEntry onCreate={handleCreateShipment} />
-          )}
-          {currentPage === 'shopify' && (
-            <ShopifySettings />
-          )}
-          {currentPage === 'api-guide' && (
-            <APIGuide setCurrentPage={setCurrentPage} />
-          )}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function LoginPage({ username, setUsername, password, setPassword, handleLogin, loading }) {
-  return (
-    <div className="login-container">
-      <div className="login-box">
-        <div className="login-header">
-          <h1>📦 Trackisto</h1>
-          <p>Admin Dashboard</p>
-        </div>
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label>Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="admin123"
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        <p className="login-hint">Default: admin / admin123</p>
-      </div>
-    </div>
-  );
-}
-
-function Dashboard({ stats, shipments, onDelete }) {
-  return (
-    <div className="dashboard">
-      <h2>Dashboard Overview</h2>
-      
-      <div className="stats-grid">
-        <div className="stat-card blue">
-          <h3>Total Shipments</h3>
-          <p className="stat-number">{stats.totalShipments}</p>
-        </div>
-        <div className="stat-card green">
-          <h3>Today's Shipments</h3>
-          <p className="stat-number">{stats.todayShipments}</p>
-        </div>
-        <div className="stat-card yellow">
-          <h3>Pending Orders</h3>
-          <p className="stat-number">{stats.pendingOrders}</p>
-        </div>
-      </div>
-
-      <div className="shipments-section">
-        <h3>Recent Shipments</h3>
-        <table className="shipments-table">
-          <thead>
-            <tr>
-              <th>Tracking #</th>
-              <th>Customer</th>
-              <th>Country</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shipments.map((shipment) => (
-              <tr key={shipment.id}>
-                <td><code>{shipment.tracking_number}</code></td>
-                <td>{shipment.customer_name}</td>
-                <td>{shipment.country}</td>
-                <td>
-                  <span className={`status-badge ${shipment.status}`}>
-                    {shipment.status}
-                  </span>
-                </td>
-                <td>{new Date(shipment.created_at).toLocaleDateString()}</td>
-                <td>
-                  <button onClick={() => onDelete(shipment.id)} className="btn btn-small btn-danger">
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function ManualEntry({ onCreate }) {
-  const [formData, setFormData] = useState({
-    customerName: '',
-    customerEmail: '',
-    shippingAddress: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'United Kingdom',
-    destinationCountry: 'United Kingdom',
-    originCountry: 'United Kingdom',
-    transitCountry: 'Netherlands',
-    deliveryDays: '7',
-    sortingDays: '3',
-    price: '',
-    postDeliveryEvent: 'None',
-    redeliveryDays: '3',
-    attempts: '1'
-  });
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onCreate(formData);
-  };
-
-  return (
-    <div className="manual-entry">
-      <h2>Manual Parcel Entry</h2>
-      <p>Create a new shipment manually. A tracking number will be generated automatically.</p>
-      
-      <form onSubmit={handleSubmit} className="entry-form">
-        <div className="form-section">
-          <h3>Customer Details</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Full Name *</label>
-              <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label>Email Address *</label>
-              <input type="email" name="customerEmail" value={formData.customerEmail} onChange={handleChange} required />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Shipping Address *</label>
-            <textarea name="shippingAddress" value={formData.shippingAddress} onChange={handleChange} required />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>City *</label>
-              <input type="text" name="city" value={formData.city} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-              <label>State</label>
-              <input type="text" name="state" value={formData.state} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-              <label>ZIP Code *</label>
-              <input type="text" name="zipCode" value={formData.zipCode} onChange={handleChange} required />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3>Delivery Information</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Destination Country *</label>
-              <select name="destinationCountry" value={formData.destinationCountry} onChange={handleChange}>
-                <option>United Kingdom</option>
-                <option>Denmark</option>
-                <option>Germany</option>
-                <option>Netherlands</option>
-                <option>United States</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Delivery Days *</label>
-              <input type="number" name="deliveryDays" value={formData.deliveryDays} onChange={handleChange} required />
-            </div>
-          </div>
-        </div>
-
-        <button type="submit" className="btn btn-primary btn-large">
-          Generate Tracking Number
-        </button>
-      </form>
-    </div>
-  );
-}
-
-function ShopifySettings() {
-  const [stores, setStores] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [formData, setFormData] = useState({
-    domain: '',
-    apiToken: '',
-    deliveryDays: '7',
-    sendOffset: '2',
-    countryOrigin: 'United Kingdom',
-    transitCountry: 'Netherlands',
-    postDeliveryEvent: 'None',
-    redeliveryDays: '3',
-    sortingDays: '3',
-    attempts: '1',
-    parcelPoint: true
-  });
-
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  const fetchStores = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/shopify/stores`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setStores(response.data.stores || []);
-    } catch (error) {
-      console.error('Error fetching stores:', error);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API_URL}/api/shopify/stores`, formData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      alert('Shopify store added successfully!');
-      setShowAddForm(false);
-      setFormData({
-        domain: '',
-        apiToken: '',
-        deliveryDays: '7',
-        sendOffset: '2',
-        countryOrigin: 'United Kingdom',
-        transitCountry: 'Netherlands',
-        postDeliveryEvent: 'None',
-        redeliveryDays: '3',
-        sortingDays: '3',
-        attempts: '1',
-        parcelPoint: true
-      });
-      fetchStores();
-    } catch (error) {
-      alert('Error adding store: ' + (error.response?.data?.error || 'Unknown error'));
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this store?')) {
-      try {
-        await axios.delete(`${API_URL}/api/shopify/stores/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        alert('Store deleted successfully');
-        fetchStores();
-      } catch (error) {
-        alert('Error deleting store: ' + (error.response?.data?.error || 'Unknown error'));
-      }
-    }
-  };
-
-  return (
-    <div className="shopify-settings">
-      <h2>Shopify Settings</h2>
-      <p style={{marginBottom: '10px'}}>Connect your Shopify store to Trackisto by entering your domain and admin API token.</p>
-
-      <button onClick={() => setShowAddForm(!showAddForm)} className="btn btn-primary" style={{marginBottom: '20px'}}>
-        {showAddForm ? '❌ Cancel' : '➕ Add Shopify Store'}
-      </button>
-
-      {showAddForm && (
-        <form onSubmit={handleSubmit} className="entry-form" style={{marginBottom: '30px', background: '#f8f9fa', padding: '30px', borderRadius: '8px'}}>
-          <div className="form-section">
-            <div className="form-row">
-              <div className="form-group">
-                <label>Shopify Domain</label>
-                <input 
-                  type="text" 
-                  value={formData.domain}
-                  onChange={(e) => setFormData({...formData, domain: e.target.value})}
-                  placeholder="your-store.myshopify.com"
-                  required 
-                />
+      <main className="main-content">
+        {currentPage === 'dashboard' && (
+          <div className="dashboard">
+            <h1>Dashboard Overview</h1>
+            <div className="stats-grid">
+              <div className="stat-card blue">
+                <h3>TOTAL SHIPMENTS</h3>
+                <p className="stat-number">{dashboardStats.total}</p>
               </div>
-              <div className="form-group">
-                <label>Admin API Token</label>
-                <input 
-                  type="text" 
-                  value={formData.apiToken}
-                  onChange={(e) => setFormData({...formData, apiToken: e.target.value})}
-                  placeholder="shpat_..."
-                  required 
-                />
+              <div className="stat-card green">
+                <h3>TODAY'S SHIPMENTS</h3>
+                <p className="stat-number">{dashboardStats.today}</p>
+              </div>
+              <div className="stat-card orange">
+                <h3>PENDING ORDERS</h3>
+                <p className="stat-number">{dashboardStats.pending}</p>
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Delivery Days</label>
-                <input 
-                  type="number" 
-                  value={formData.deliveryDays}
-                  onChange={(e) => setFormData({...formData, deliveryDays: e.target.value})}
-                  min="1"
-                />
-              </div>
-              <div className="form-group">
-                <label>Country of Origin</label>
-                <select 
-                  value={formData.countryOrigin}
-                  onChange={(e) => setFormData({...formData, countryOrigin: e.target.value})}
-                >
-                  <option>United Kingdom</option>
-                  <option>Denmark</option>
-                  <option>Germany</option>
-                  <option>Netherlands</option>
-                </select>
-              </div>
+
+            <div className="recent-shipments">
+              <h2>Recent Shipments</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>TRACKING #</th>
+                    <th>CUSTOMER</th>
+                    <th>COUNTRY</th>
+                    <th>STATUS</th>
+                    <th>CREATED</th>
+                    <th>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shipments.slice(0, 10).map(shipment => (
+                    <tr key={shipment.id}>
+                      <td>{shipment.tracking_number}</td>
+                      <td>{shipment.customer_name}</td>
+                      <td>{shipment.country}</td>
+                      <td><span className={`status ${shipment.status}`}>{shipment.status}</span></td>
+                      <td>{new Date(shipment.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <button className="btn-small">View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-large">Add Store</button>
-        </form>
-      )}
-
-      <div className="shopify-stores">
-        <h3>Connected Stores</h3>
-        {stores.length === 0 ? (
-          <p>No stores connected yet.</p>
-        ) : (
-          <table className="shipments-table">
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>Domain</th>
-                <th>Delivery Days</th>
-                <th>Country of Origin</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stores.map((store) => (
-                <tr key={store.id}>
-                  <td>{store.status === 'active' ? '✅' : '❌'}</td>
-                  <td><code>{store.domain}</code></td>
-                  <td>{store.delivery_days}</td>
-                  <td>{store.country_origin}</td>
-                  <td>
-                    <button onClick={() => handleDelete(store.id)} className="btn btn-small btn-danger">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
-      </div>
-    </div>
-  );
-}
 
-function APIGuide({ setCurrentPage }) {
-  return (
-    <div className="api-guide" style={{maxWidth: '900px', margin: '0 auto'}}>
-      <button onClick={() => setCurrentPage('shopify')} className="btn" style={{marginBottom: '20px'}}>
-        ← Back to Shopify Settings
-      </button>
+        {currentPage === 'shopify' && (
+          <div className="shopify-settings">
+            <h1>Shopify Settings</h1>
+            <p className="description">
+              Connect your Shopify store to Trackisto by entering your domain and Admin API token. 
+              This allows the system to auto-import and fulfill your orders with generated tracking numbers.
+            </p>
+            <p className="validation-note">All credentials are validated live when this page loads.</p>
 
-      <div style={{background: 'white', padding: '40px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
-        <h1 style={{fontSize: '32px', marginBottom: '10px'}}>How to Create a Shopify API Token</h1>
-        <p style={{color: '#666', marginBottom: '30px'}}>Follow these steps to generate your Shopify Admin API token.</p>
+            {/* URL Converter */}
+            <div className="url-converter">
+              <p>📋 Need help? <a href="#" onClick={(e) => { e.preventDefault(); alert('1. Go to your Shopify Admin\n2. Go to Settings > Apps and sales channels > Develop apps\n3. Create an app and configure Admin API scopes\n4. Install the app and copy the Admin API access token'); }}>Click here for setup instructions</a></p>
+              <label>Paste Shopify Admin URL (auto-convert)</label>
+              <div className="converter-row">
+                <input
+                  type="text"
+                  placeholder="https://admin.shopify.com/store/your-store/......."
+                  value={pasteUrl}
+                  onChange={(e) => setPasteUrl(e.target.value)}
+                />
+                <button onClick={handleConvertUrl}>Convert</button>
+              </div>
+              <small>It will extract the correct <code>your-store.myshopify.com</code> domain automatically.</small>
+            </div>
 
-        <div style={{marginBottom: '30px'}}>
-          <h2>Step 1: Open App Development</h2>
-          <p>Go to admin.shopify.com → Settings → Apps and sales channels → Develop apps</p>
-        </div>
+            {/* Add Store Button / Form */}
+            {!showAddStore ? (
+              <button className="btn-add-store" onClick={() => setShowAddStore(true)}>
+                + Add Shopify Store
+              </button>
+            ) : (
+              <div className="store-form-container">
+                <button className="btn-cancel" onClick={() => { setShowAddStore(false); resetStoreForm(); }}>
+                  ✕ Cancel
+                </button>
+                
+                <form onSubmit={handleAddStore} className="store-form">
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Shopify Domain</label>
+                      <input
+                        type="text"
+                        placeholder="your-store.myshopify.com"
+                        value={storeForm.domain}
+                        onChange={(e) => setStoreForm({ ...storeForm, domain: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Admin API Token</label>
+                      <input
+                        type="text"
+                        placeholder="shpat_..."
+                        value={storeForm.api_token}
+                        onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Delivery Days</label>
+                      <input
+                        type="number"
+                        value={storeForm.delivery_days}
+                        onChange={(e) => setStoreForm({ ...storeForm, delivery_days: parseInt(e.target.value) })}
+                        min="1"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Send Offset (Days)</label>
+                      <input
+                        type="number"
+                        value={storeForm.send_offset}
+                        onChange={(e) => setStoreForm({ ...storeForm, send_offset: parseInt(e.target.value) })}
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Country of Origin</label>
+                      <select
+                        value={storeForm.country_origin}
+                        onChange={(e) => setStoreForm({ ...storeForm, country_origin: e.target.value })}
+                        required
+                      >
+                        <option value="">Select Country...</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Transit Country</label>
+                      <select
+                        value={storeForm.transit_country}
+                        onChange={(e) => setStoreForm({ ...storeForm, transit_country: e.target.value })}
+                      >
+                        <option value="">Select Country...</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Post Delivery Event</label>
+                      <select
+                        value={storeForm.post_delivery_event}
+                        onChange={(e) => setStoreForm({ ...storeForm, post_delivery_event: e.target.value })}
+                      >
+                        {postDeliveryEvents.map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Sorting Days</label>
+                      <input
+                        type="number"
+                        value={storeForm.sorting_days}
+                        onChange={(e) => setStoreForm({ ...storeForm, sorting_days: parseInt(e.target.value) })}
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Parcel Point</label>
+                      <select
+                        value={storeForm.parcel_point ? 'Yes' : 'No'}
+                        onChange={(e) => setStoreForm({ ...storeForm, parcel_point: e.target.value === 'Yes' })}
+                      >
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Parcel Point Days</label>
+                      <input
+                        type="number"
+                        value={storeForm.parcel_point_days}
+                        onChange={(e) => setStoreForm({ ...storeForm, parcel_point_days: parseInt(e.target.value) })}
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Redelivery Active</label>
+                      <select
+                        value={storeForm.redelivery_active ? 'Yes' : 'No'}
+                        onChange={(e) => setStoreForm({ ...storeForm, redelivery_active: e.target.value === 'Yes' })}
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Redelivery Days</label>
+                      <input
+                        type="number"
+                        value={storeForm.redelivery_days}
+                        onChange={(e) => setStoreForm({ ...storeForm, redelivery_days: parseInt(e.target.value) })}
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Attempts</label>
+                      <input
+                        type="number"
+                        value={storeForm.attempts}
+                        onChange={(e) => setStoreForm({ ...storeForm, attempts: parseInt(e.target.value) })}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <button type="submit" className="btn-submit" disabled={loading}>
+                    {loading ? 'Saving...' : (editingStore ? 'Update Store' : 'Add Store')}
+                  </button>
+                </form>
+              </div>
+            )}
 
-        <div style={{marginBottom: '30px'}}>
-          <h2>Step 2: Create an App</h2>
-          <p>Click "Create an app" and give it a name like "Tracking System"</p>
-        </div>
+            {/* Connected Stores Table */}
+            <div className="stores-table">
+              <h2>Connected Stores</h2>
+              {stores.length === 0 ? (
+                <p className="no-stores">No stores connected yet.</p>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Domain</th>
+                      <th>Days</th>
+                      <th>Offset</th>
+                      <th>Redelivery Active</th>
+                      <th>Redelivery Days</th>
+                      <th>Attempts</th>
+                      <th>Parcel Point</th>
+                      <th>Parcel Point Days</th>
+                      <th>Sorting Days</th>
+                      <th>Country of Origin</th>
+                      <th>Transit Country</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stores.map(store => (
+                      <tr key={store.id}>
+                        <td>
+                          <span 
+                            className={`status-indicator ${store.status === 'active' ? 'active' : 'inactive'}`}
+                            onClick={() => toggleStoreStatus(store)}
+                            title={store.status === 'active' ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
+                          >
+                            {store.status === 'active' ? '✓' : '✕'}
+                          </span>
+                        </td>
+                        <td>{store.domain}</td>
+                        <td>{store.delivery_days}</td>
+                        <td>{store.send_offset || 0}</td>
+                        <td>{store.redelivery_active ? 'Yes' : 'No'}</td>
+                        <td>{store.redelivery_days || 3}</td>
+                        <td>{store.attempts || 1}</td>
+                        <td>{store.parcel_point ? 'Yes' : 'No'}</td>
+                        <td>{store.parcel_point_days || 3}</td>
+                        <td>{store.sorting_days || 3}</td>
+                        <td>{store.country_origin}</td>
+                        <td>{store.transit_country || '-'}</td>
+                        <td>
+                          <button className="btn-edit" onClick={() => handleEditStore(store)}>Edit</button>
+                          <button className="btn-delete" onClick={() => handleDeleteStore(store.id)}>Del</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
 
-        <div style={{marginBottom: '30px'}}>
-          <h2>Step 3: Configure API Scopes</h2>
-          <p>Enable: read_orders, write_orders, read_fulfillments, write_fulfillments</p>
-        </div>
+        {currentPage === 'shipments' && (
+          <div className="shipments">
+            <h1>Manual Entry</h1>
+            <p>Create shipments manually here.</p>
+            {/* Manual entry form would go here */}
+          </div>
+        )}
 
-        <div style={{marginBottom: '30px'}}>
-          <h2>Step 4: Install and Copy Token</h2>
-          <p>Install the app and copy your Admin API access token (starts with shpat_)</p>
-        </div>
-      </div>
+        {currentPage === 'missing' && (
+          <div className="missing">
+            <h1>Missing Entries</h1>
+            <p>Shipments that need attention.</p>
+          </div>
+        )}
+
+        {currentPage === 'api' && (
+          <div className="api-guide">
+            <h1>API Guide</h1>
+            <p>Documentation for the Trackisto API.</p>
+            <h3>Base URL</h3>
+            <code>{API_URL}</code>
+            <h3>Endpoints</h3>
+            <ul>
+              <li><strong>GET /api/tracking/:trackingNumber</strong> - Get tracking info</li>
+              <li><strong>POST /api/shopify/webhook/order-created</strong> - Shopify webhook</li>
+            </ul>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
