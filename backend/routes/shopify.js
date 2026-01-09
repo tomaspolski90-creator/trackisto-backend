@@ -2,26 +2,22 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
-// Middleware to verify token (simplified)
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ message: 'No token provided' });
   }
-  // In production, verify JWT token here
   next();
 };
 
-// Get all stores
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, domain, api_token, delivery_days, send_offset, country_origin, 
-              transit_country, post_delivery_event, sorting_days, parcel_point,
-              parcel_point_days, redelivery_active, redelivery_days, attempts, 
-              status, created_at 
-       FROM shopify_stores 
-       ORDER BY created_at DESC`
+      `SELECT id, domain, api_token, delivery_days, send_offset, fulfillment_time,
+              country_origin, transit_country, post_delivery_event, sorting_days, 
+              parcel_point, parcel_point_days, redelivery_active, redelivery_days, 
+              attempts, status, created_at 
+       FROM shopify_stores ORDER BY created_at DESC`
     );
     res.json({ stores: result.rows });
   } catch (error) {
@@ -30,23 +26,13 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new store
 router.post('/stores', authMiddleware, async (req, res) => {
   try {
     const {
-      domain,
-      api_token,
-      delivery_days = 7,
-      send_offset = 0,
-      country_origin = 'United Kingdom',
-      transit_country = '',
-      post_delivery_event = 'None',
-      sorting_days = 3,
-      parcel_point = true,
-      parcel_point_days = 3,
-      redelivery_active = false,
-      redelivery_days = 3,
-      attempts = 1
+      domain, api_token, delivery_days = 7, send_offset = 0, fulfillment_time = '10:00',
+      country_origin = 'United Kingdom', transit_country = '', post_delivery_event = 'None',
+      sorting_days = 3, parcel_point = true, parcel_point_days = 3,
+      redelivery_active = false, redelivery_days = 3, attempts = 1
     } = req.body;
 
     if (!domain || !api_token) {
@@ -55,13 +41,13 @@ router.post('/stores', authMiddleware, async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO shopify_stores 
-       (domain, api_token, delivery_days, send_offset, country_origin, transit_country,
-        post_delivery_event, sorting_days, parcel_point, parcel_point_days,
+       (domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, 
+        transit_country, post_delivery_event, sorting_days, parcel_point, parcel_point_days,
         redelivery_active, redelivery_days, attempts, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active', NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'active', NOW())
        RETURNING *`,
-      [domain, api_token, delivery_days, send_offset, country_origin, transit_country,
-       post_delivery_event, sorting_days, parcel_point, parcel_point_days,
+      [domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin,
+       transit_country, post_delivery_event, sorting_days, parcel_point, parcel_point_days,
        redelivery_active, redelivery_days, attempts]
     );
 
@@ -72,43 +58,31 @@ router.post('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Update store
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      domain,
-      api_token,
-      delivery_days,
-      send_offset,
-      country_origin,
-      transit_country,
-      post_delivery_event,
-      sorting_days,
-      parcel_point,
-      parcel_point_days,
-      redelivery_active,
-      redelivery_days,
-      attempts
+      domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin,
+      transit_country, post_delivery_event, sorting_days, parcel_point, parcel_point_days,
+      redelivery_active, redelivery_days, attempts
     } = req.body;
 
     const result = await db.query(
       `UPDATE shopify_stores 
        SET domain = $1, api_token = $2, delivery_days = $3, send_offset = $4,
-           country_origin = $5, transit_country = $6, post_delivery_event = $7,
-           sorting_days = $8, parcel_point = $9, parcel_point_days = $10,
-           redelivery_active = $11, redelivery_days = $12, attempts = $13
-       WHERE id = $14
-       RETURNING *`,
-      [domain, api_token, delivery_days, send_offset, country_origin, transit_country,
-       post_delivery_event, sorting_days, parcel_point, parcel_point_days,
+           fulfillment_time = $5, country_origin = $6, transit_country = $7, 
+           post_delivery_event = $8, sorting_days = $9, parcel_point = $10, 
+           parcel_point_days = $11, redelivery_active = $12, redelivery_days = $13, 
+           attempts = $14
+       WHERE id = $15 RETURNING *`,
+      [domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin,
+       transit_country, post_delivery_event, sorting_days, parcel_point, parcel_point_days,
        redelivery_active, redelivery_days, attempts, id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Store not found' });
     }
-
     res.json({ store: result.rows[0], message: 'Store updated successfully' });
   } catch (error) {
     console.error('Error updating store:', error);
@@ -116,21 +90,17 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Update store status
 router.put('/stores/:id/status', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     const result = await db.query(
       'UPDATE shopify_stores SET status = $1 WHERE id = $2 RETURNING *',
       [status, id]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Store not found' });
     }
-
     res.json({ store: result.rows[0], message: 'Status updated' });
   } catch (error) {
     console.error('Error updating store status:', error);
@@ -138,19 +108,13 @@ router.put('/stores/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
-// Delete store
 router.delete('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.query(
-      'DELETE FROM shopify_stores WHERE id = $1 RETURNING *',
-      [id]
-    );
-
+    const result = await db.query('DELETE FROM shopify_stores WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Store not found' });
     }
-
     res.json({ message: 'Store deleted successfully' });
   } catch (error) {
     console.error('Error deleting store:', error);
@@ -158,94 +122,186 @@ router.delete('/stores/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Webhook for order created
-router.post('/webhook/order-created', async (req, res) => {
-  try {
-    console.log('Received Shopify webhook');
-    const order = req.body;
-    
-    // Get store settings based on the shop domain
-    const shopDomain = req.headers['x-shopify-shop-domain'];
-    let storeSettings = {
-      delivery_days: 7,
-      country_origin: 'United Kingdom',
-      transit_country: '',
-      sorting_days: 3
-    };
-
-    if (shopDomain) {
-      const storeResult = await db.query(
-        'SELECT * FROM shopify_stores WHERE domain = $1 AND status = $2',
-        [shopDomain, 'active']
-      );
-      if (storeResult.rows.length > 0) {
-        storeSettings = storeResult.rows[0];
+// Auto-fulfill functions
+async function fetchUnfulfilledOrders(store) {
+  const response = await fetch(
+    `https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled`,
+    {
+      headers: {
+        'X-Shopify-Access-Token': store.api_token,
+        'Content-Type': 'application/json'
       }
     }
+  );
+  if (!response.ok) throw new Error(`Failed to fetch orders: ${response.status}`);
+  const data = await response.json();
+  return data.orders || [];
+}
 
-    // Generate tracking number
-    const trackingNumber = 'DK' + Date.now() + Math.floor(Math.random() * 1000);
+async function fulfillOrderInShopify(store, order, trackingNumber) {
+  const fulfillmentOrdersRes = await fetch(
+    `https://${store.domain}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`,
+    {
+      headers: {
+        'X-Shopify-Access-Token': store.api_token,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  if (!fulfillmentOrdersRes.ok) throw new Error('Failed to get fulfillment orders');
+  
+  const fulfillmentOrdersData = await fulfillmentOrdersRes.json();
+  const fulfillmentOrder = fulfillmentOrdersData.fulfillment_orders?.[0];
+  if (!fulfillmentOrder) throw new Error('No fulfillment order found');
+
+  const fulfillmentRes = await fetch(
+    `https://${store.domain}/admin/api/2024-01/fulfillments.json`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Shopify-Access-Token': store.api_token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fulfillment: {
+          line_items_by_fulfillment_order: [{ fulfillment_order_id: fulfillmentOrder.id }],
+          tracking_info: {
+            number: trackingNumber,
+            url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}`
+          },
+          notify_customer: true
+        }
+      })
+    }
+  );
+  if (!fulfillmentRes.ok) {
+    const errorData = await fulfillmentRes.json();
+    throw new Error(`Failed to fulfill: ${JSON.stringify(errorData)}`);
+  }
+  return await fulfillmentRes.json();
+}
+
+function generateTrackingNumber() {
+  return 'DK' + Date.now() + Math.floor(Math.random() * 1000);
+}
+
+async function processAutoFulfillment() {
+  console.log('[Auto-Fulfill] Starting check...');
+  try {
+    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const stores = storesResult.rows;
+    console.log(`[Auto-Fulfill] Found ${stores.length} active stores`);
     
-    // Calculate estimated delivery
-    const estimatedDelivery = new Date();
-    estimatedDelivery.setDate(estimatedDelivery.getDate() + (storeSettings.delivery_days || 7));
-
-    // Get shipping address
-    const shippingAddress = order.shipping_address || {};
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
     
-    // Create shipment
-    const result = await db.query(
-      `INSERT INTO shipments 
-       (tracking_number, customer_name, customer_email, shipping_address, city, 
-        state, zip_code, country, origin_country, transit_country, destination_country,
-        status, delivery_days, sorting_days, estimated_delivery, price, 
-        shopify_order_id, shopify_store_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
-       RETURNING *`,
-      [
-        trackingNumber,
-        `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Unknown',
-        order.email || '',
-        `${shippingAddress.address1 || ''} ${shippingAddress.address2 || ''}`.trim(),
-        shippingAddress.city || '',
-        shippingAddress.province || '',
-        shippingAddress.zip || '',
-        shippingAddress.country || 'Unknown',
-        storeSettings.country_origin || 'United Kingdom',
-        storeSettings.transit_country || '',
-        shippingAddress.country || 'Unknown',
-        'label_created',
-        storeSettings.delivery_days || 7,
-        storeSettings.sorting_days || 3,
-        estimatedDelivery,
-        order.total_price || 0,
-        order.id?.toString() || '',
-        storeSettings.id || null
-      ]
-    );
-
-    console.log('Created shipment:', result.rows[0].tracking_number);
-
-    // Create initial tracking event
-    await db.query(
-      `INSERT INTO tracking_events 
-       (shipment_id, status, location, description, event_date, event_time, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [
-        result.rows[0].id,
-        'label_created',
-        storeSettings.country_origin || 'United Kingdom',
-        'Shipping label created, package awaiting pickup',
-        new Date().toISOString().split('T')[0],
-        new Date().toTimeString().split(' ')[0]
-      ]
-    );
-
-    res.status(200).json({ success: true, tracking_number: trackingNumber });
+    for (const store of stores) {
+      try {
+        const fulfillTime = store.fulfillment_time || '10:00';
+        const [fulfillHour, fulfillMin] = fulfillTime.split(':').map(Number);
+        const fulfillMinutes = fulfillHour * 60 + fulfillMin;
+        const currentMinutes = currentHour * 60 + currentMinute;
+        
+        if (Math.abs(currentMinutes - fulfillMinutes) > 30) {
+          console.log(`[Auto-Fulfill] Skipping ${store.domain} - not fulfillment time (${fulfillTime})`);
+          continue;
+        }
+        
+        console.log(`[Auto-Fulfill] Processing store: ${store.domain}`);
+        const orders = await fetchUnfulfilledOrders(store);
+        console.log(`[Auto-Fulfill] Found ${orders.length} unfulfilled orders`);
+        
+        const sendOffsetDays = store.send_offset || 0;
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - sendOffsetDays);
+        
+        for (const order of orders) {
+          try {
+            const orderDate = new Date(order.created_at);
+            if (orderDate > cutoffDate) continue;
+            
+            const existingShipment = await db.query(
+              'SELECT id FROM shipments WHERE shopify_order_id = $1',
+              [order.id.toString()]
+            );
+            if (existingShipment.rows.length > 0) continue;
+            
+            const trackingNumber = generateTrackingNumber();
+            await fulfillOrderInShopify(store, order, trackingNumber);
+            console.log(`[Auto-Fulfill] Fulfilled order ${order.id} with tracking ${trackingNumber}`);
+            
+            const estimatedDelivery = new Date();
+            estimatedDelivery.setDate(estimatedDelivery.getDate() + (store.delivery_days || 7));
+            const shippingAddress = order.shipping_address || {};
+            
+            const shipmentResult = await db.query(
+              `INSERT INTO shipments 
+               (tracking_number, customer_name, customer_email, shipping_address, city, 
+                state, zip_code, country, origin_country, transit_country, destination_country,
+                status, delivery_days, sorting_days, estimated_delivery, price, 
+                shopify_order_id, shopify_store_id, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
+               RETURNING *`,
+              [
+                trackingNumber,
+                `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Unknown',
+                order.email || '',
+                `${shippingAddress.address1 || ''} ${shippingAddress.address2 || ''}`.trim(),
+                shippingAddress.city || '',
+                shippingAddress.province || '',
+                shippingAddress.zip || '',
+                shippingAddress.country || 'Unknown',
+                store.country_origin || 'United Kingdom',
+                store.transit_country || '',
+                shippingAddress.country || 'Unknown',
+                'label_created',
+                store.delivery_days || 7,
+                store.sorting_days || 3,
+                estimatedDelivery,
+                order.total_price || 0,
+                order.id.toString(),
+                store.id
+              ]
+            );
+            
+            await db.query(
+              `INSERT INTO tracking_events 
+               (shipment_id, status, location, description, event_date, event_time, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+              [
+                shipmentResult.rows[0].id,
+                'label_created',
+                store.country_origin || 'United Kingdom',
+                'Shipping label created, package awaiting pickup',
+                new Date().toISOString().split('T')[0],
+                new Date().toTimeString().split(' ')[0]
+              ]
+            );
+            console.log(`[Auto-Fulfill] Saved shipment ${trackingNumber}`);
+          } catch (orderError) {
+            console.error(`[Auto-Fulfill] Error processing order ${order.id}:`, orderError.message);
+          }
+        }
+      } catch (storeError) {
+        console.error(`[Auto-Fulfill] Error processing store ${store.domain}:`, storeError.message);
+      }
+    }
+    console.log('[Auto-Fulfill] Completed');
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ message: 'Webhook processing failed' });
+    console.error('[Auto-Fulfill] Fatal error:', error);
+  }
+}
+
+router.post('/auto-fulfill', authMiddleware, async (req, res) => {
+  try {
+    await processAutoFulfillment();
+    res.json({ message: 'Auto-fulfillment triggered successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to trigger auto-fulfillment' });
   }
 });
+
+router.processAutoFulfillment = processAutoFulfillment;
 
 module.exports = router;
