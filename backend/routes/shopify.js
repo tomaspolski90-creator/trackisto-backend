@@ -19,7 +19,7 @@ router.get('/auth', (req, res) => {
   const { shop } = req.query;
   if (!shop) return res.status(400).json({ message: 'Shop parameter required' });
   
-  const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_products,read_locations';
+  const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,read_locations';
   const redirectUri = `${BACKEND_URL}/api/shopify/callback`;
   const nonce = crypto.randomBytes(16).toString('hex');
   
@@ -212,6 +212,13 @@ function generateTrackingNumber() {
   return 'DK' + Date.now() + Math.floor(Math.random() * 1000);
 }
 
+// Helper function to get Danish time
+function getDanishTime() {
+  const now = new Date();
+  const danishTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
+  return danishTime;
+}
+
 async function processAutoFulfillment() {
   console.log('[Auto-Fulfill] Starting check...');
   try {
@@ -219,9 +226,11 @@ async function processAutoFulfillment() {
     const stores = storesResult.rows;
     console.log(`[Auto-Fulfill] Found ${stores.length} active stores`);
     
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+    // Use Danish timezone
+    const danishTime = getDanishTime();
+    const currentHour = danishTime.getHours();
+    const currentMinute = danishTime.getMinutes();
+    console.log(`[Auto-Fulfill] Current Danish time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
     
     for (const store of stores) {
       try {
@@ -231,7 +240,7 @@ async function processAutoFulfillment() {
         const currentMinutes = currentHour * 60 + currentMinute;
         
         if (Math.abs(currentMinutes - fulfillMinutes) > 30) {
-          console.log(`[Auto-Fulfill] Skipping ${store.domain} - not fulfillment time (${fulfillTime})`);
+          console.log(`[Auto-Fulfill] Skipping ${store.domain} - not fulfillment time (${fulfillTime}), current: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
           continue;
         }
         
@@ -247,6 +256,12 @@ async function processAutoFulfillment() {
           try {
             const orderDate = new Date(order.created_at);
             if (orderDate > cutoffDate) continue;
+            
+            // Skip orders without shipping address
+            if (!order.shipping_address || !order.shipping_address.first_name) {
+              console.log(`[Auto-Fulfill] Skipping order ${order.id} - no shipping address`);
+              continue;
+            }
             
             const existingShipment = await db.query('SELECT id FROM shipments WHERE shopify_order_id = $1', [order.id.toString()]);
             if (existingShipment.rows.length > 0) continue;
