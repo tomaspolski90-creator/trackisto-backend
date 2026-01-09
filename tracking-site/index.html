@@ -810,12 +810,25 @@
         const API_URL = 'https://trackisto-backend.onrender.com';
         let currentTrackingNumber = '';
 
+        // Check URL for tracking parameter on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const trackingParam = params.get('tracking');
+            if (trackingParam) {
+                document.getElementById('trackingInput').value = trackingParam;
+                // Trigger search automatically
+                searchTracking(trackingParam);
+            }
+        });
+
         document.getElementById('searchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const trackingNumber = document.getElementById('trackingInput').value.trim();
-            
             if (!trackingNumber) return;
+            searchTracking(trackingNumber);
+        });
 
+        async function searchTracking(trackingNumber) {
             const searchBtn = document.getElementById('searchBtn');
             const errorMessage = document.getElementById('errorMessage');
             
@@ -839,7 +852,7 @@
                 searchBtn.disabled = false;
                 searchBtn.innerHTML = 'Track <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>';
             }
-        });
+        }
 
         function displayResults(data) {
             document.getElementById('heroSection').style.display = 'none';
@@ -939,6 +952,8 @@
             document.getElementById('trackingInput').value = '';
             document.getElementById('errorMessage').innerHTML = '';
             currentTrackingNumber = '';
+            // Clear URL parameter
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     </script>
 </body>
