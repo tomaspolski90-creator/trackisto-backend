@@ -37,7 +37,6 @@ router.get('/callback', async (req, res) => {
   }
   
   try {
-    // Exchange code for access token
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,7 +54,6 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
     }
     
-    // Save or update store in database
     const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [shop]);
     
     if (existingStore.rows.length > 0) {
@@ -93,7 +91,7 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Update store settings (not token)
+// Update store settings
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -156,16 +154,27 @@ async function fetchUnfulfilledOrders(store) {
 }
 
 async function fulfillOrderInShopify(store, order, trackingNumber) {
+  // Get fulfillment orders
   const fulfillmentOrdersRes = await fetch(
     `https://${store.domain}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`,
     { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
   );
-  if (!fulfillmentOrdersRes.ok) throw new Error('Failed to get fulfillment orders');
+  
+  if (!fulfillmentOrdersRes.ok) {
+    const errorText = await fulfillmentOrdersRes.text();
+    console.log('[Auto-Fulfill] Fulfillment orders response:', errorText);
+    throw new Error('Failed to get fulfillment orders');
+  }
   
   const fulfillmentOrdersData = await fulfillmentOrdersRes.json();
-  const fulfillmentOrder = fulfillmentOrdersData.fulfillment_orders?.[0];
-  if (!fulfillmentOrder) throw new Error('No fulfillment order found');
+  console.log('[Auto-Fulfill] Fulfillment orders:', JSON.stringify(fulfillmentOrdersData));
+  
+  const fulfillmentOrder = fulfillmentOrdersData.fulfillment_orders?.find(fo => fo.status === 'open');
+  const foToUse = fulfillmentOrder || fulfillmentOrdersData.fulfillment_orders?.[0];
+  
+  if (!foToUse) throw new Error('No fulfillment order found');
 
+  // Create fulfillment
   const fulfillmentRes = await fetch(
     `https://${store.domain}/admin/api/2024-01/fulfillments.json`,
     {
@@ -173,15 +182,27 @@ async function fulfillOrderInShopify(store, order, trackingNumber) {
       headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fulfillment: {
-          line_items_by_fulfillment_order: [{ fulfillment_order_id: fulfillmentOrder.id }],
-          tracking_info: { number: trackingNumber, url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}` },
+          line_items_by_fulfillment_order: [{ 
+            fulfillment_order_id: foToUse.id,
+            fulfillment_order_line_items: foToUse.line_items.map(li => ({
+              id: li.id,
+              quantity: li.fulfillable_quantity
+            }))
+          }],
+          tracking_info: { 
+            number: trackingNumber, 
+            url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}`,
+            company: 'Trackisto'
+          },
           notify_customer: true
         }
       })
     }
   );
+  
   if (!fulfillmentRes.ok) {
     const errorData = await fulfillmentRes.json();
+    console.log('[Auto-Fulfill] Fulfillment error:', JSON.stringify(errorData));
     throw new Error(`Failed to fulfill: ${JSON.stringify(errorData)}`);
   }
   return await fulfillmentRes.json();
