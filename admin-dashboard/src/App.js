@@ -282,7 +282,47 @@ function App() {
 
         {currentPage === 'shipments' && <div className="shipments"><h1>Manual Entry</h1><p>Create shipments manually here.</p></div>}
         {currentPage === 'missing' && <div className="missing"><h1>Missing Entries</h1><p>Shipments that need attention.</p></div>}
-        {currentPage === 'api' && <div className="api-guide"><h1>API Guide</h1><code>{API_URL}</code></div>}
+        {currentPage === 'api' && (
+          <div className="api-guide">
+            <h1>How to Create a Shopify API Token</h1>
+            <p>Follow these 7 steps to generate your Shopify Admin API token and connect your store to Trackisto.</p>
+            
+            <h3>Step 1: Open App Development</h3>
+            <p>Go to admin.shopify.com and login, then search for <strong>App development</strong> in your Shopify Admin settings, and click it.</p>
+            
+            <h3>Step 2: Click "Create an App"</h3>
+            <p>Once inside App Development, click the <strong>Create an app</strong> button.</p>
+            
+            <h3>Step 3: Name the App</h3>
+            <p>Give your app a name like "tracking" and proceed.</p>
+            
+            <h3>Step 4: Go to Admin API Configuration</h3>
+            <p>Click <strong>Configure Admin API scopes</strong> to begin selecting access permissions.</p>
+            
+            <h3>Step 5: Select Required API Scopes</h3>
+            <p>Enable all of the following Admin API scopes:</p>
+            <ul>
+              <li>read_orders</li>
+              <li>write_orders</li>
+              <li>read_fulfillments</li>
+              <li>write_fulfillments</li>
+              <li>read_products</li>
+              <li>read_locations</li>
+              <li>write_assigned_fulfillment_orders</li>
+              <li>read_assigned_fulfillment_orders</li>
+              <li>read_merchant_managed_fulfillment_orders</li>
+              <li>write_merchant_managed_fulfillment_orders</li>
+            </ul>
+            
+            <h3>Step 6: Install the App</h3>
+            <p>Click <strong>Install app</strong> to finalize and authorize your custom app.</p>
+            
+            <h3>Step 7: Copy the Admin API Token</h3>
+            <p>Reveal and copy your <strong>Admin API token</strong> (you can only view it once!). Paste this token into the Trackisto Shopify Settings page.</p>
+            
+            <div className="warning-box">⚠️ This token is sensitive. Only reveal and use it securely inside your Trackisto admin panel.</div>
+          </div>
+        )}
       </main>
     </div>
   );
