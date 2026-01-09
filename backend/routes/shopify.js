@@ -258,7 +258,7 @@ async function processAutoFulfillment() {
             if (orderDate > cutoffDate) continue;
             
             // Skip orders without shipping address
-            if (!order.shipping_address || !order.shipping_address.first_name) {
+            if (!order.shipping_address || (!order.shipping_address.first_name && !order.shipping_address.last_name && !order.shipping_address.name)) {
               console.log(`[Auto-Fulfill] Skipping order ${order.id} - no shipping address`);
               continue;
             }
