@@ -21,15 +21,34 @@ function App() {
     redelivery_active: false, redelivery_days: 3, attempts: 1
   });
   const [pasteUrl, setPasteUrl] = useState('');
+  
+  // Manual Entry Form State
+  const [manualForm, setManualForm] = useState({
+    customer_name: '',
+    customer_email: '',
+    shipping_address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    country: '',
+    delivery_days: 7,
+    country_origin: '',
+    transit_country: '',
+    sorting_days: 3,
+    post_delivery_event: 'Redelivery',
+    redelivery_days: 3,
+    attempts: 1
+  });
+  const [generatedTracking, setGeneratedTracking] = useState(null);
 
   const countries = [
-    'United Kingdom', 'Germany', 'Netherlands', 'Denmark', 'France', 
+    'Denmark', 'United Kingdom', 'Germany', 'Netherlands', 'France', 
     'Belgium', 'Italy', 'Spain', 'Poland', 'Sweden', 'Norway',
     'Austria', 'Switzerland', 'Ireland', 'Portugal', 'Czech Republic',
     'Finland', 'Greece', 'Hungary', 'Romania', 'United States', 'Canada'
   ];
 
-  const postDeliveryEvents = ['None', 'Survey Email', 'Review Request', 'Thank You Email'];
+  const postDeliveryEvents = ['None', 'Redelivery', 'Parcel Point', 'Return to Sender'];
 
   const timeOptions = [];
   for (let h = 6; h <= 22; h++) {
@@ -150,6 +169,101 @@ function App() {
     } catch (error) { console.error('Failed to toggle store status:', error); }
   };
 
+  // Generate tracking number based on country
+  const generateTrackingNumber = (country) => {
+    const countryCode = country === 'Denmark' ? 'DK' : 
+                        country === 'United Kingdom' ? 'UK' :
+                        country === 'Germany' ? 'DE' :
+                        country === 'Netherlands' ? 'NL' :
+                        country === 'France' ? 'FR' :
+                        country === 'Sweden' ? 'SE' :
+                        country === 'Norway' ? 'NO' :
+                        country === 'United States' ? 'US' : 'XX';
+    return countryCode + Date.now() + Math.floor(Math.random() * 1000);
+  };
+
+  // Handle Manual Entry Submit
+  const handleManualSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const trackingNumber = generateTrackingNumber(manualForm.country);
+      const estimatedDelivery = new Date();
+      estimatedDelivery.setDate(estimatedDelivery.getDate() + manualForm.delivery_days);
+
+      const shipmentData = {
+        tracking_number: trackingNumber,
+        customer_name: manualForm.customer_name,
+        customer_email: manualForm.customer_email,
+        shipping_address: manualForm.shipping_address,
+        city: manualForm.city,
+        state: manualForm.state,
+        zip_code: manualForm.zip_code,
+        country: manualForm.country,
+        origin_country: manualForm.country_origin,
+        transit_country: manualForm.transit_country,
+        destination_country: manualForm.country,
+        status: 'label_created',
+        delivery_days: manualForm.delivery_days,
+        sorting_days: manualForm.sorting_days,
+        estimated_delivery: estimatedDelivery.toISOString()
+      };
+
+      const response = await fetch(`${API_URL}/api/shipments`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(shipmentData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGeneratedTracking({
+          tracking_number: trackingNumber,
+          customer_name: manualForm.customer_name,
+          country: manualForm.country,
+          estimated_delivery: estimatedDelivery
+        });
+        
+        // Reset form
+        setManualForm({
+          customer_name: '',
+          customer_email: '',
+          shipping_address: '',
+          city: '',
+          state: '',
+          zip_code: '',
+          country: '',
+          delivery_days: 7,
+          country_origin: '',
+          transit_country: '',
+          sorting_days: 3,
+          post_delivery_event: 'Redelivery',
+          redelivery_days: 3,
+          attempts: 1
+        });
+        
+        fetchDashboardData();
+      } else {
+        const data = await response.json();
+        alert('Failed to create shipment: ' + data.message);
+      }
+    } catch (error) {
+      alert('Failed to create shipment: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const copyTrackingNumber = () => {
+    if (generatedTracking) {
+      navigator.clipboard.writeText(generatedTracking.tracking_number);
+      alert('Tracking number copied!');
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="login-container">
@@ -243,7 +357,7 @@ function App() {
                     <div className="form-group"><label>Admin API Token</label><input type="text" placeholder="shpat_..." value={storeForm.api_token} onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })} required /></div>
                     <div className="form-group"><label>Delivery Days</label><input type="number" value={storeForm.delivery_days} onChange={(e) => setStoreForm({ ...storeForm, delivery_days: parseInt(e.target.value) })} min="1" required /></div>
                     <div className="form-group"><label>Send Offset (Days)</label><input type="number" value={storeForm.send_offset} onChange={(e) => setStoreForm({ ...storeForm, send_offset: parseInt(e.target.value) })} min="0" /></div>
-                    <div className="form-group"><label>Fulfillment Time</label><select value={storeForm.fulfillment_time} onChange={(e) => setStoreForm({ ...storeForm, fulfillment_time: e.target.value })}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select><small className="field-hint">Orders fulfilled at this time daily</small></div>
+                    <div className="form-group"><label>Fulfillment Time</label><select value={storeForm.fulfillment_time} onChange={(e) => setStoreForm({ ...storeForm, fulfillment_time: e.target.value })}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select><small className="field-hint">Orders fulfilled at this time daily (Danish time)</small></div>
                     <div className="form-group"><label>Country of Origin</label><select value={storeForm.country_origin} onChange={(e) => setStoreForm({ ...storeForm, country_origin: e.target.value })} required><option value="">Select...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                     <div className="form-group"><label>Transit Country</label><select value={storeForm.transit_country} onChange={(e) => setStoreForm({ ...storeForm, transit_country: e.target.value })}><option value="">Select...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                     <div className="form-group"><label>Post Delivery Event</label><select value={storeForm.post_delivery_event} onChange={(e) => setStoreForm({ ...storeForm, post_delivery_event: e.target.value })}>{postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -280,8 +394,196 @@ function App() {
           </div>
         )}
 
-        {currentPage === 'shipments' && <div className="shipments"><h1>Manual Entry</h1><p>Create shipments manually here.</p></div>}
-        {currentPage === 'missing' && <div className="missing"><h1>Missing Entries</h1><p>Shipments that need attention.</p></div>}
+        {currentPage === 'shipments' && (
+          <div className="manual-entry">
+            <h1>Manual Parcel Entry</h1>
+            
+            <div className="manual-entry-container">
+              <div className="manual-entry-info">
+                <p>This panel lets you manually register a parcel directly into the system.</p>
+                <p>A tracking number is automatically generated using the customer's country code and a unique 13-digit identifier, following the same logic used for automated Shopify imports.</p>
+              </div>
+
+              {generatedTracking && (
+                <div className="success-box">
+                  <h3>✅ Tracking Created Successfully!</h3>
+                  <div className="tracking-result">
+                    <p><strong>Tracking Number:</strong> {generatedTracking.tracking_number}</p>
+                    <p><strong>Customer:</strong> {generatedTracking.customer_name}</p>
+                    <p><strong>Destination:</strong> {generatedTracking.country}</p>
+                    <p><strong>Est. Delivery:</strong> {generatedTracking.estimated_delivery.toLocaleDateString()}</p>
+                    <button className="btn-copy" onClick={copyTrackingNumber}>📋 Copy Tracking Number</button>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleManualSubmit} className="manual-form">
+                <div className="form-section">
+                  <h3 className="section-title">Customer Details</h3>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Full Name</label>
+                      <input 
+                        type="text" 
+                        value={manualForm.customer_name} 
+                        onChange={(e) => setManualForm({...manualForm, customer_name: e.target.value})}
+                        required 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Email Address</label>
+                      <input 
+                        type="email" 
+                        value={manualForm.customer_email} 
+                        onChange={(e) => setManualForm({...manualForm, customer_email: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group full-width">
+                    <label>Shipping Address</label>
+                    <textarea 
+                      value={manualForm.shipping_address} 
+                      onChange={(e) => setManualForm({...manualForm, shipping_address: e.target.value})}
+                      rows="2"
+                    />
+                  </div>
+                  <div className="form-row three-col">
+                    <div className="form-group">
+                      <label>City</label>
+                      <input 
+                        type="text" 
+                        value={manualForm.city} 
+                        onChange={(e) => setManualForm({...manualForm, city: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>State / Region</label>
+                      <input 
+                        type="text" 
+                        value={manualForm.state} 
+                        onChange={(e) => setManualForm({...manualForm, state: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>ZIP / Postal Code</label>
+                      <input 
+                        type="text" 
+                        value={manualForm.zip_code} 
+                        onChange={(e) => setManualForm({...manualForm, zip_code: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-section">
+                  <h3 className="section-title">Delivery Info</h3>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Destination Country <span className="hint">(Customer's country)</span></label>
+                      <select 
+                        value={manualForm.country} 
+                        onChange={(e) => setManualForm({...manualForm, country: e.target.value})}
+                        required
+                      >
+                        <option value="">Select Country...</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Delivery Days <span className="hint">(Estimated transit time)</span></label>
+                      <input 
+                        type="number" 
+                        value={manualForm.delivery_days} 
+                        onChange={(e) => setManualForm({...manualForm, delivery_days: parseInt(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Country of Origin <span className="hint">(Where parcel ships from)</span></label>
+                      <select 
+                        value={manualForm.country_origin} 
+                        onChange={(e) => setManualForm({...manualForm, country_origin: e.target.value})}
+                      >
+                        <option value="">Select Country...</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Transit Country <span className="hint">(Optional stopover country)</span></label>
+                      <select 
+                        value={manualForm.transit_country} 
+                        onChange={(e) => setManualForm({...manualForm, transit_country: e.target.value})}
+                      >
+                        <option value="">Select Country...</option>
+                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group" style={{maxWidth: '250px'}}>
+                    <label>Sorting Days <span className="hint">(Days at sorting facility)</span></label>
+                    <input 
+                      type="number" 
+                      value={manualForm.sorting_days} 
+                      onChange={(e) => setManualForm({...manualForm, sorting_days: parseInt(e.target.value)})}
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-section">
+                  <h3 className="section-title">Post Delivery Settings</h3>
+                  <div className="form-group" style={{maxWidth: '250px'}}>
+                    <label>Post Delivery Event <span className="hint">(What happens after failed delivery)</span></label>
+                    <select 
+                      value={manualForm.post_delivery_event} 
+                      onChange={(e) => setManualForm({...manualForm, post_delivery_event: e.target.value})}
+                    >
+                      {postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Redelivery Days <span className="hint">(Days before redelivery attempt)</span></label>
+                      <input 
+                        type="number" 
+                        value={manualForm.redelivery_days} 
+                        onChange={(e) => setManualForm({...manualForm, redelivery_days: parseInt(e.target.value)})}
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Attempts <span className="hint">(Max delivery attempts)</span></label>
+                      <input 
+                        type="number" 
+                        value={manualForm.attempts} 
+                        onChange={(e) => setManualForm({...manualForm, attempts: parseInt(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn-generate" disabled={loading}>
+                  {loading ? 'Generating...' : 'Generate Tracking'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'missing' && (
+          <div className="missing">
+            <h1>Missing Entries</h1>
+            <p>Shipments that need attention will appear here.</p>
+            <div className="empty-state">
+              <span className="empty-icon">📭</span>
+              <p>No missing entries at this time.</p>
+            </div>
+          </div>
+        )}
+
         {currentPage === 'api' && (
           <div className="api-guide">
             <h1>How to Create a Shopify API Token</h1>
