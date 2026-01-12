@@ -798,7 +798,7 @@
             </div>
             <div>
                 <h4>Contact</h4>
-                <p><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="90e3e5e0e0ffe2e4d0e2e6e3fcfff7f9e3e4f9f3e3bef3fffd">[email&#160;protected]</a></p>
+                <p id="footerEmail"></p>
                 <p>Mon-Fri: 8:00-17:00</p>
             </div>
         </div>
@@ -807,7 +807,12 @@
         </div>
     </footer>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script>
+        // Email obfuscation workaround
+        var user = 'support';
+        var domain = 'rvslogistics.com';
+        document.getElementById('footerEmail').textContent = user + '@' + domain;
+
         const API_URL = 'https://trackisto-backend.onrender.com';
         let currentTrackingNumber = '';
 
@@ -951,4 +956,11 @@
             document.getElementById('featuresSection').style.display = 'block';
             document.getElementById('results').classList.remove('show');
             document.getElementById('trackingInput').value = '';
-            document.getElementById
+            document.getElementById('errorMessage').innerHTML = '';
+            currentTrackingNumber = '';
+            // Clear URL parameter
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    </script>
+</body>
+</html>

@@ -428,7 +428,7 @@
             <h2>Contact Us</h2>
             <p>
                 Have questions or need assistance? We're here to help!<br>
-                Email us at <a href="/cdn-cgi/l/email-protection#cfbcbabfbfa0bdbb8fbdb9bca3a0a8a6bcbba6acbce1aca0a2" style="color: #00a0d6; font-weight: 600;"><span class="__cf_email__" data-cfemail="9feceaefeff0edebdfede9ecf3f0f8f6ecebf6fcecb1fcf0f2">[email&#160;protected]</span></a>
+                Email us at <span id="aboutEmail" style="color: #00a0d6; font-weight: 600;"></span>
             </p>
         </div>
     </div>
@@ -449,4 +449,21 @@
             </div>
             <div>
                 <h4>Contact</h4>
-                <p><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="83f0f6f3f3ecf1f7c3f1f5f0e
+                <p id="footerEmail"></p>
+                <p>Mon-Fri: 8:00-17:00</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            © 2025 RVS Logistics. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        var user = 'support';
+        var domain = 'rvslogistics.com';
+        var email = user + '@' + domain;
+        document.getElementById('aboutEmail').innerHTML = '<a href="mai' + 'lto:' + email + '" style="color: #00a0d6; font-weight: 600;">' + email + '</a>';
+        document.getElementById('footerEmail').textContent = email;
+    </script>
+</body>
+</html>

@@ -412,7 +412,7 @@
                 <div class="faq-question">How do I report a problem with my delivery?</div>
                 <div class="faq-answer">
                     <div class="faq-answer-content">
-                        Contact our customer support team via email at <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="097a7c7979667b7d497b7f7a65666e607a7d606a7a276a6664">[email&#160;protected]</a> with your tracking number 
+                        Contact our customer support team via email at <span id="faqEmail"></span> with your tracking number 
                         and a description of the problem. We'll investigate and get back to you within 24 hours.
                     </div>
                 </div>
@@ -442,7 +442,7 @@
             </div>
             <div>
                 <h4>Contact</h4>
-                <p><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="54272124243b262014262227383b333d27203d37277a373b39">[email&#160;protected]</a></p>
+                <p id="footerEmail"></p>
                 <p>Mon-Fri: 8:00-17:00</p>
             </div>
         </div>
@@ -451,14 +451,31 @@
         </div>
     </footer>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script>
+        var user = 'support';
+        var domain = 'rvslogistics.com';
+        var email = user + '@' + domain;
+        document.getElementById('faqEmail').textContent = email;
+        document.getElementById('footerEmail').textContent = email;
+
         document.querySelectorAll('.faq-question').forEach(question => {
             question.addEventListener('click', () => {
                 const answer = question.nextElementSibling;
                 const isOpen = answer.classList.contains('show');
                 
-                // Close all answers
                 document.querySelectorAll('.faq-answer').forEach(a => {
                     a.classList.remove('show');
                 });
-                document.querySelectorAll('.faq-question').forEach(
+                document.querySelectorAll('.faq-question').forEach(q => {
+                    q.classList.remove('active');
+                });
+                
+                if (!isOpen) {
+                    answer.classList.add('show');
+                    question.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
