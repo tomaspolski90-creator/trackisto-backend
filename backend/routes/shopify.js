@@ -91,6 +91,60 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
+// Get pending orders from all connected Shopify stores
+router.get('/pending-orders', authMiddleware, async (req, res) => {
+  try {
+    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const stores = storesResult.rows;
+    
+    let allOrders = [];
+    
+    for (const store of stores) {
+      try {
+        const response = await fetch(
+          `https://${store.domain}/admin/api/2024-01/orders.json?status=any&limit=50`,
+          { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const orders = data.orders || [];
+          
+          // Map orders to our format
+          const mappedOrders = orders.map(order => ({
+            id: order.id,
+            order_number: order.order_number,
+            customer_name: order.shipping_address 
+              ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() || order.shipping_address.name || 'Unknown'
+              : order.customer?.first_name 
+                ? `${order.customer.first_name} ${order.customer.last_name || ''}`.trim()
+                : 'Unknown',
+            country: order.shipping_address?.country || 'Unknown',
+            total_price: order.total_price,
+            currency: order.currency,
+            created_at: order.created_at,
+            fulfillment_status: order.fulfillment_status || 'unfulfilled',
+            financial_status: order.financial_status,
+            store_domain: store.domain
+          }));
+          
+          allOrders = [...allOrders, ...mappedOrders];
+        }
+      } catch (storeError) {
+        console.error(`Error fetching orders from ${store.domain}:`, storeError.message);
+      }
+    }
+    
+    // Sort by created_at descending
+    allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    res.json({ orders: allOrders });
+  } catch (error) {
+    console.error('Error fetching pending orders:', error);
+    res.status(500).json({ message: 'Failed to fetch pending orders' });
+  }
+});
+
 // Update store settings
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
