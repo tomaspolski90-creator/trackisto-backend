@@ -26,6 +26,7 @@ function App() {
   const [dashboardTab, setDashboardTab] = useState('recent');
   const [pendingOrders, setPendingOrders] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [selectedStore, setSelectedStore] = useState('all');
   
   // Manual Entry Form State
   const [manualForm, setManualForm] = useState({
@@ -75,10 +76,10 @@ function App() {
   }, [token]);
 
   // Fetch pending orders from Shopify
-  const fetchPendingOrders = async () => {
+  const fetchPendingOrders = async (storeFilter = selectedStore) => {
     setPendingLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/shopify/pending-orders`, {
+      const response = await fetch(`${API_URL}/api/shopify/pending-orders${storeFilter !== 'all' ? `?store=${storeFilter}` : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -92,6 +93,19 @@ function App() {
     }
     setPendingLoading(false);
   };
+
+  // Filter pending orders by selected store
+  const filteredPendingOrders = selectedStore === 'all' 
+    ? pendingOrders 
+    : pendingOrders.filter(order => order.store_domain === selectedStore);
+
+  // Filter shipments by selected store
+  const filteredShipments = selectedStore === 'all'
+    ? shipments
+    : shipments.filter(s => {
+        const store = stores.find(st => st.id === s.shopify_store_id);
+        return store?.domain === selectedStore;
+      });
 
   useEffect(() => {
     if (token) { setIsLoggedIn(true); fetchDashboardData(); }
@@ -288,6 +302,14 @@ function App() {
     }
   };
 
+  // Handle store filter change
+  const handleStoreFilterChange = (storeDomain) => {
+    setSelectedStore(storeDomain);
+    if (dashboardTab === 'pending') {
+      fetchPendingOrders(storeDomain);
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="login-container">
@@ -335,7 +357,7 @@ function App() {
             <div className="stats-grid">
               <div className="stat-card blue"><h3>TOTAL SHIPMENTS</h3><p className="stat-number">{dashboardStats.total}</p></div>
               <div className="stat-card green"><h3>TODAY'S SHIPMENTS</h3><p className="stat-number">{dashboardStats.today}</p></div>
-              <div className="stat-card orange"><h3>PENDING ORDERS</h3><p className="stat-number">{pendingOrders.length}</p></div>
+              <div className="stat-card orange"><h3>PENDING ORDERS</h3><p className="stat-number">{filteredPendingOrders.length}</p></div>
             </div>
             
             {/* Dashboard Tabs */}
@@ -352,9 +374,23 @@ function App() {
               >
                 Pending Shipments
               </button>
+              
+              {/* Store Filter */}
+              <div className="store-filter">
+                <select 
+                  value={selectedStore} 
+                  onChange={(e) => handleStoreFilterChange(e.target.value)}
+                >
+                  <option value="all">All Stores</option>
+                  {stores.map(store => (
+                    <option key={store.id} value={store.domain}>{store.domain}</option>
+                  ))}
+                </select>
+              </div>
+              
               <button 
                 className="fetch-btn"
-                onClick={fetchPendingOrders}
+                onClick={() => fetchPendingOrders()}
                 disabled={pendingLoading}
               >
                 <span className="fetch-icon">⬇</span>
@@ -368,7 +404,7 @@ function App() {
                 <table>
                   <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
                   <tbody>
-                    {shipments.slice(0, 10).map(s => (
+                    {filteredShipments.slice(0, 10).map(s => (
                       <tr key={s.id}>
                         <td>{s.tracking_number}</td><td>{s.customer_name}</td><td>{s.country}</td>
                         <td><span className={`status ${s.status}`}>{s.status}</span></td>
@@ -376,7 +412,7 @@ function App() {
                         <td><button className="btn-small">View</button></td>
                       </tr>
                     ))}
-                    {shipments.length === 0 && (
+                    {filteredShipments.length === 0 && (
                       <tr><td colSpan="6" className="no-data">No shipments yet</td></tr>
                     )}
                   </tbody>
@@ -402,7 +438,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingOrders.map(order => (
+                      {filteredPendingOrders.map(order => (
                         <tr key={order.id}>
                           <td>#{order.order_number}</td>
                           <td>{order.customer_name}</td>
@@ -416,7 +452,7 @@ function App() {
                           </td>
                         </tr>
                       ))}
-                      {pendingOrders.length === 0 && (
+                      {filteredPendingOrders.length === 0 && (
                         <tr><td colSpan="6" className="no-data">No pending orders. Click "Fetch Pending Parcels" to load.</td></tr>
                       )}
                     </tbody>
