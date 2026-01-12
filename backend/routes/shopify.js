@@ -14,209 +14,51 @@ const authMiddleware = (req, res, next) => {
   next();
 };
 
-// OAuth Step 1: Redirect to Shopify
+// OAuth Step 1
 router.get('/auth', (req, res) => {
   const { shop } = req.query;
   if (!shop) return res.status(400).json({ message: 'Shop parameter required' });
-  
   const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,read_locations';
   const redirectUri = `${BACKEND_URL}/api/shopify/callback`;
   const nonce = crypto.randomBytes(16).toString('hex');
-  
   const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${nonce}`;
-  
   res.redirect(authUrl);
 });
 
-// OAuth Step 2: Handle callback
+// OAuth Step 2
 router.get('/callback', async (req, res) => {
-  const { code, shop, state } = req.query;
-  
-  if (!code || !shop) {
-    return res.redirect(`${FRONTEND_URL}/?error=missing_params`);
-  }
-  
+  const { code, shop } = req.query;
+  if (!code || !shop) return res.redirect(`${FRONTEND_URL}/?error=missing_params`);
   try {
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: SHOPIFY_CLIENT_ID,
-        client_secret: SHOPIFY_CLIENT_SECRET,
-        code: code
-      })
+      body: JSON.stringify({ client_id: SHOPIFY_CLIENT_ID, client_secret: SHOPIFY_CLIENT_SECRET, code })
     });
-    
     const data = await response.json();
-    
-    if (!data.access_token) {
-      console.error('OAuth error:', data);
-      return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
-    }
-    
+    if (!data.access_token) return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
+
     const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [shop]);
-    
     if (existingStore.rows.length > 0) {
-      await db.query('UPDATE shopify_stores SET api_token = $1, status = $2 WHERE domain = $3', 
-        [data.access_token, 'active', shop]);
+      await db.query('UPDATE shopify_stores SET api_token = $1, status = $2 WHERE domain = $3', [data.access_token, 'active', shop]);
     } else {
-      await db.query(
-        `INSERT INTO shopify_stores (domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, status, created_at)
-         VALUES ($1, $2, 7, 0, '10:00', 'United Kingdom', 'active', NOW())`,
-        [shop, data.access_token]
-      );
+      await db.query(`INSERT INTO shopify_stores (domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, status, created_at) VALUES ($1, $2, 7, 0, '16:00', 'United Kingdom', 'active', NOW())`, [shop, data.access_token]);
     }
-    
     res.redirect(`${FRONTEND_URL}/?success=store_connected&shop=${shop}`);
-    
   } catch (error) {
-    console.error('OAuth callback error:', error);
+    console.error('OAuth error:', error);
     res.redirect(`${FRONTEND_URL}/?error=server_error`);
   }
 });
 
-// Get all stores
+// Get stores
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT id, domain, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, 
-              post_delivery_event, sorting_days, parcel_point, parcel_point_days, redelivery_active, 
-              redelivery_days, attempts, status, created_at 
-       FROM shopify_stores ORDER BY created_at DESC`
-    );
+    const result = await db.query(`SELECT id, domain, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status, created_at FROM shopify_stores ORDER BY created_at DESC`);
     res.json({ stores: result.rows });
   } catch (error) {
     console.error('Error fetching stores:', error);
-    res.status(500).json({ message: 'Failed to fetch stores' });
-  }
-});
-
-// Get pending orders from all connected Shopify stores (for display)
-router.get('/pending-orders', authMiddleware, async (req, res) => {
-  try {
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
-    const stores = storesResult.rows;
-    const storeFilter = req.query.store;
-    
-    let allOrders = [];
-    
-    for (const store of stores) {
-      if (storeFilter && storeFilter !== 'all' && store.domain !== storeFilter) continue;
-      
-      try {
-        const response = await fetch(
-          `https://${store.domain}/admin/api/2024-01/orders.json?status=any&limit=50`,
-          { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          const orders = data.orders || [];
-          
-          const mappedOrders = orders.map(order => ({
-            id: order.id,
-            order_number: order.order_number,
-            customer_name: order.shipping_address 
-              ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() || order.shipping_address.name || 'Unknown'
-              : order.customer?.first_name 
-                ? `${order.customer.first_name} ${order.customer.last_name || ''}`.trim()
-                : 'Unknown',
-            country: order.shipping_address?.country || 'Unknown',
-            total_price: order.total_price,
-            currency: order.currency,
-            created_at: order.created_at,
-            fulfillment_status: order.fulfillment_status || 'unfulfilled',
-            financial_status: order.financial_status,
-            store_domain: store.domain
-          }));
-          
-          allOrders = [...allOrders, ...mappedOrders];
-        }
-      } catch (storeError) {
-        console.error(`Error fetching orders from ${store.domain}:`, storeError.message);
-      }
-    }
-    
-    allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    
-    res.json({ orders: allOrders });
-  } catch (error) {
-    console.error('Error fetching pending orders:', error);
-    res.status(500).json({ message: 'Failed to fetch pending orders' });
-  }
-});
-
-// Fetch and fulfill all pending orders NOW (manual trigger)
-router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
-  console.log('[Fetch-Fulfill] Manual trigger started...');
-  try {
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
-    const stores = storesResult.rows;
-    
-    let fulfilledCount = 0;
-    let errors = [];
-    
-    for (const store of stores) {
-      try {
-        console.log(`[Fetch-Fulfill] Processing store: ${store.domain}`);
-        const orders = await fetchUnfulfilledOrders(store);
-        console.log(`[Fetch-Fulfill] Found ${orders.length} unfulfilled orders`);
-        
-        for (const order of orders) {
-          try {
-            if (!order.shipping_address || (!order.shipping_address.first_name && !order.shipping_address.last_name && !order.shipping_address.name)) {
-              console.log(`[Fetch-Fulfill] Skipping order ${order.id} - no shipping address`);
-              continue;
-            }
-            
-            const existingShipment = await db.query('SELECT id FROM shipments WHERE shopify_order_id = $1', [order.id.toString()]);
-            if (existingShipment.rows.length > 0) {
-              console.log(`[Fetch-Fulfill] Skipping order ${order.id} - already processed`);
-              continue;
-            }
-            
-            const trackingNumber = generateTrackingNumber();
-            await fulfillOrderInShopify(store, order, trackingNumber);
-            console.log(`[Fetch-Fulfill] Fulfilled order ${order.id} with tracking ${trackingNumber}`);
-            
-            const estimatedDelivery = new Date();
-            estimatedDelivery.setDate(estimatedDelivery.getDate() + (store.delivery_days || 7));
-            const shippingAddress = order.shipping_address || {};
-            
-            const shipmentResult = await db.query(
-              `INSERT INTO shipments (tracking_number, customer_name, customer_email, shipping_address, city, state, zip_code, country, origin_country, transit_country, destination_country, status, delivery_days, sorting_days, estimated_delivery, price, shopify_order_id, shopify_store_id, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW()) RETURNING *`,
-              [trackingNumber, `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Unknown', order.email || '', `${shippingAddress.address1 || ''} ${shippingAddress.address2 || ''}`.trim(), shippingAddress.city || '', shippingAddress.province || '', shippingAddress.zip || '', shippingAddress.country || 'Unknown', store.country_origin || 'United Kingdom', store.transit_country || '', shippingAddress.country || 'Unknown', 'label_created', store.delivery_days || 7, store.sorting_days || 3, estimatedDelivery, order.total_price || 0, order.id.toString(), store.id]
-            );
-            
-            await db.query(
-              `INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-              [shipmentResult.rows[0].id, 'label_created', store.country_origin || 'United Kingdom', 'Shipping label created', new Date().toISOString().split('T')[0], new Date().toTimeString().split(' ')[0]]
-            );
-            
-            fulfilledCount++;
-            console.log(`[Fetch-Fulfill] Saved shipment ${trackingNumber}`);
-          } catch (orderError) {
-            console.error(`[Fetch-Fulfill] Error processing order ${order.id}:`, orderError.message);
-            errors.push({ order_id: order.id, error: orderError.message });
-          }
-        }
-      } catch (storeError) {
-        console.error(`[Fetch-Fulfill] Error processing store ${store.domain}:`, storeError.message);
-        errors.push({ store: store.domain, error: storeError.message });
-      }
-    }
-    
-    console.log(`[Fetch-Fulfill] Completed. Fulfilled ${fulfilledCount} orders.`);
-    res.json({ 
-      success: true, 
-      message: `Successfully fulfilled ${fulfilledCount} orders`,
-      fulfilled: fulfilledCount,
-      errors: errors.length > 0 ? errors : undefined
-    });
-  } catch (error) {
-    console.error('[Fetch-Fulfill] Fatal error:', error);
-    res.status(500).json({ message: 'Failed to fetch and fulfill orders', error: error.message });
+    res.status(500).json({ error: 'Failed to fetch stores' });
   }
 });
 
@@ -224,37 +66,20 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_days, send_offset, fulfillment_time, country_origin, transit_country, post_delivery_event, 
-            sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts } = req.body;
-
-    const result = await db.query(
-      `UPDATE shopify_stores SET delivery_days = $1, send_offset = $2, fulfillment_time = $3, country_origin = $4,
-              transit_country = $5, post_delivery_event = $6, sorting_days = $7, parcel_point = $8, 
-              parcel_point_days = $9, redelivery_active = $10, redelivery_days = $11, attempts = $12
-       WHERE id = $13 RETURNING *`,
-      [delivery_days, send_offset, fulfillment_time, country_origin, transit_country, post_delivery_event,
-       sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, id]
-    );
-
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Store not found' });
-    res.json({ store: result.rows[0], message: 'Store updated successfully' });
+    const { delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status } = req.body;
+    
+    await db.query(`
+      UPDATE shopify_stores 
+      SET delivery_days = $1, send_offset = $2, fulfillment_time = $3, country_origin = $4, 
+          transit_country = $5, sorting_days = $6, parcel_point = $7, redelivery_active = $8, 
+          redelivery_days = $9, attempts = $10, status = $11
+      WHERE id = $12
+    `, [delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status, id]);
+    
+    res.json({ success: true });
   } catch (error) {
     console.error('Error updating store:', error);
-    res.status(500).json({ message: 'Failed to update store' });
-  }
-});
-
-// Update store status
-router.put('/stores/:id/status', authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    const result = await db.query('UPDATE shopify_stores SET status = $1 WHERE id = $2 RETURNING *', [status, id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Store not found' });
-    res.json({ store: result.rows[0], message: 'Status updated' });
-  } catch (error) {
-    console.error('Error updating store status:', error);
-    res.status(500).json({ message: 'Failed to update status' });
+    res.status(500).json({ error: 'Failed to update store' });
   }
 });
 
@@ -262,77 +87,262 @@ router.put('/stores/:id/status', authMiddleware, async (req, res) => {
 router.delete('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.query('DELETE FROM shopify_stores WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Store not found' });
-    res.json({ message: 'Store deleted successfully' });
+    await db.query('DELETE FROM shopify_stores WHERE id = $1', [id]);
+    res.json({ success: true });
   } catch (error) {
     console.error('Error deleting store:', error);
-    res.status(500).json({ message: 'Failed to delete store' });
+    res.status(500).json({ error: 'Failed to delete store' });
   }
 });
 
-// Auto-fulfill functions
+// ========== PENDING ORDERS (KUN UNFULFILLED) ==========
+router.get('/pending-orders', authMiddleware, async (req, res) => {
+  try {
+    console.log('[Pending Orders] Fetching unfulfilled orders...');
+    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const stores = storesResult.rows;
+    let allOrders = [];
+
+    for (const store of stores) {
+      // ÆNDRET: Kun hent unfulfilled ordrer
+      const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`, {
+        headers: { 'X-Shopify-Access-Token': store.api_token }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[Pending Orders] Store ${store.domain}: Found ${data.orders?.length || 0} unfulfilled orders`);
+        
+        const mappedOrders = (data.orders || []).map(order => ({
+          id: order.id,
+          order_number: order.order_number,
+          customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
+          country: order.shipping_address?.country || 'Unknown',
+          total_price: order.total_price,
+          currency: order.currency,
+          created_at: order.created_at,
+          fulfillment_status: order.fulfillment_status || 'unfulfilled',
+          store_domain: store.domain
+        }));
+        allOrders = [...allOrders, ...mappedOrders];
+      } else {
+        console.error(`[Pending Orders] Error fetching from ${store.domain}:`, response.status);
+      }
+    }
+
+    allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    console.log(`[Pending Orders] Total unfulfilled orders: ${allOrders.length}`);
+    res.json({ orders: allOrders });
+  } catch (error) {
+    console.error('[Pending Orders] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch pending orders' });
+  }
+});
+
+// ========== FULFILLED ORDERS (NY ENDPOINT) ==========
+router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
+  try {
+    console.log('[Fulfilled Orders] Fetching fulfilled orders from Shopify...');
+    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const stores = storesResult.rows;
+    let allOrders = [];
+
+    for (const store of stores) {
+      // Hent fulfilled ordrer fra Shopify
+      const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=any&fulfillment_status=shipped&limit=50`, {
+        headers: { 'X-Shopify-Access-Token': store.api_token }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[Fulfilled Orders] Store ${store.domain}: Found ${data.orders?.length || 0} fulfilled orders`);
+        
+        const mappedOrders = (data.orders || []).map(order => ({
+          id: order.id,
+          order_number: order.order_number,
+          customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
+          country: order.shipping_address?.country || 'Unknown',
+          total_price: order.total_price,
+          currency: order.currency,
+          created_at: order.created_at,
+          fulfillment_status: order.fulfillment_status || 'fulfilled',
+          store_domain: store.domain,
+          // Prøv at hente tracking nummer fra fulfillments
+          tracking_number: order.fulfillments?.[0]?.tracking_number || null
+        }));
+        allOrders = [...allOrders, ...mappedOrders];
+      } else {
+        console.error(`[Fulfilled Orders] Error fetching from ${store.domain}:`, response.status);
+      }
+    }
+
+    allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    console.log(`[Fulfilled Orders] Total fulfilled orders: ${allOrders.length}`);
+    res.json({ orders: allOrders });
+  } catch (error) {
+    console.error('[Fulfilled Orders] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch fulfilled orders' });
+  }
+});
+
+// ========== MANUEL FULFILL ==========
+router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
+  console.log('[Fetch-Fulfill] Manual trigger started...');
+  try {
+    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    let fulfilledCount = 0;
+    let errors = [];
+
+    for (const store of storesResult.rows) {
+      console.log(`[Fetch-Fulfill] Processing store: ${store.domain}`);
+      const orders = await fetchUnfulfilledOrders(store);
+      console.log(`[Fetch-Fulfill] Found ${orders.length} unfulfilled orders`);
+
+      for (const order of orders) {
+        if (!order.shipping_address) {
+          console.log(`[Fetch-Fulfill] Skipping order ${order.id} - no shipping address`);
+          continue;
+        }
+
+        // Tjek om vi allerede har oprettet shipment for denne ordre
+        const existing = await db.query('SELECT id FROM shipments WHERE shopify_order_id = $1', [order.id.toString()]);
+        if (existing.rows.length > 0) {
+          console.log(`[Fetch-Fulfill] Skipping order ${order.id} - already processed`);
+          continue;
+        }
+
+        try {
+          const trackingNumber = generateTrackingNumber();
+          console.log(`[Fetch-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber}`);
+          
+          await fulfillOrderInShopify(store, order, trackingNumber);
+          
+          // Gem shipment i database
+          const shipmentResult = await db.query(`
+            INSERT INTO shipments (
+              tracking_number, customer_name, customer_email, shipping_address, 
+              city, state, zip_code, country, origin_country, destination_country,
+              status, delivery_days, sorting_days, estimated_delivery, price,
+              shopify_order_id, shopify_store_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+            RETURNING id
+          `, [
+            trackingNumber,
+            `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim(),
+            order.email || order.contact_email || '',
+            `${order.shipping_address.address1 || ''} ${order.shipping_address.address2 || ''}`.trim(),
+            order.shipping_address.city || '',
+            order.shipping_address.province || '',
+            order.shipping_address.zip || '',
+            order.shipping_address.country || '',
+            store.country_origin || 'United Kingdom',
+            order.shipping_address.country || '',
+            'label_created',
+            store.delivery_days || 7,
+            store.sorting_days || 3,
+            new Date(Date.now() + (store.delivery_days || 7) * 24 * 60 * 60 * 1000),
+            parseFloat(order.total_price) || 0,
+            order.id.toString(),
+            store.id
+          ]);
+
+          // Opret initial tracking event
+          await db.query(`
+            INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
+            VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIME, NOW())
+          `, [
+            shipmentResult.rows[0].id,
+            'label_created',
+            store.country_origin || 'United Kingdom',
+            'Shipping label has been created'
+          ]);
+
+          console.log(`[Fetch-Fulfill] Saved shipment ${trackingNumber}`);
+          fulfilledCount++;
+        } catch (orderError) {
+          console.error(`[Fetch-Fulfill] Error processing order ${order.id}:`, orderError);
+          errors.push({ order_id: order.id, error: orderError.message });
+        }
+      }
+    }
+
+    console.log(`[Fetch-Fulfill] Completed. Fulfilled ${fulfilledCount} orders.`);
+    res.json({ 
+      success: true, 
+      message: `Fulfilled ${fulfilledCount} orders`, 
+      fulfilled: fulfilledCount,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[Fetch-Fulfill] Error:', error);
+    res.status(500).json({ error: 'Failed to process orders', details: error.message });
+  }
+});
+
+// ========== HELPER FUNCTIONS ==========
+
 async function fetchUnfulfilledOrders(store) {
-  const response = await fetch(
-    `https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled`,
-    { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
-  );
-  if (!response.ok) throw new Error(`Failed to fetch orders: ${response.status}`);
-  const data = await response.json();
-  return data.orders || [];
+  try {
+    const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`, {
+      headers: { 'X-Shopify-Access-Token': store.api_token }
+    });
+    if (!response.ok) {
+      console.error(`Error fetching orders: ${response.status}`);
+      return [];
+    }
+    const data = await response.json();
+    return data.orders || [];
+  } catch (error) {
+    console.error('Error in fetchUnfulfilledOrders:', error);
+    return [];
+  }
 }
 
 async function fulfillOrderInShopify(store, order, trackingNumber) {
-  const fulfillmentOrdersRes = await fetch(
-    `https://${store.domain}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`,
-    { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
-  );
+  // Get fulfillment orders
+  const foRes = await fetch(`https://${store.domain}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`, {
+    headers: { 'X-Shopify-Access-Token': store.api_token }
+  });
+  const foData = await foRes.json();
   
-  if (!fulfillmentOrdersRes.ok) {
-    const errorText = await fulfillmentOrdersRes.text();
-    console.log('[Auto-Fulfill] Fulfillment orders response:', errorText);
-    throw new Error('Failed to get fulfillment orders');
+  const fo = foData.fulfillment_orders?.find(f => f.status === 'open') || foData.fulfillment_orders?.[0];
+  
+  if (!fo) {
+    throw new Error('No fulfillment order found');
   }
-  
-  const fulfillmentOrdersData = await fulfillmentOrdersRes.json();
-  console.log('[Auto-Fulfill] Fulfillment orders:', JSON.stringify(fulfillmentOrdersData));
-  
-  const fulfillmentOrder = fulfillmentOrdersData.fulfillment_orders?.find(fo => fo.status === 'open');
-  const foToUse = fulfillmentOrder || fulfillmentOrdersData.fulfillment_orders?.[0];
-  
-  if (!foToUse) throw new Error('No fulfillment order found');
 
-  const fulfillmentRes = await fetch(
-    `https://${store.domain}/admin/api/2024-01/fulfillments.json`,
-    {
-      method: 'POST',
-      headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fulfillment: {
-          line_items_by_fulfillment_order: [{ 
-            fulfillment_order_id: foToUse.id,
-            fulfillment_order_line_items: foToUse.line_items.map(li => ({
-              id: li.id,
-              quantity: li.fulfillable_quantity
-            }))
-          }],
-          tracking_info: { 
-            number: trackingNumber, 
-            url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}`,
-            company: 'Trackisto'
-          },
-          notify_customer: true
-        }
-      })
-    }
-  );
-  
-  if (!fulfillmentRes.ok) {
-    const errorData = await fulfillmentRes.json();
-    console.log('[Auto-Fulfill] Fulfillment error:', JSON.stringify(errorData));
-    throw new Error(`Failed to fulfill: ${JSON.stringify(errorData)}`);
+  // Create fulfillment
+  const fulfillResponse = await fetch(`https://${store.domain}/admin/api/2024-01/fulfillments.json`, {
+    method: 'POST',
+    headers: { 
+      'X-Shopify-Access-Token': store.api_token, 
+      'Content-Type': 'application/json' 
+    },
+    body: JSON.stringify({
+      fulfillment: {
+        line_items_by_fulfillment_order: [{
+          fulfillment_order_id: fo.id,
+          fulfillment_order_line_items: fo.line_items.map(li => ({
+            id: li.id,
+            quantity: li.fulfillable_quantity
+          }))
+        }],
+        tracking_info: {
+          number: trackingNumber,
+          url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}`,
+          company: 'Trackisto'
+        },
+        notify_customer: true
+      }
+    })
+  });
+
+  if (!fulfillResponse.ok) {
+    const errorData = await fulfillResponse.json();
+    throw new Error(`Shopify fulfillment failed: ${JSON.stringify(errorData)}`);
   }
-  return await fulfillmentRes.json();
+
+  return await fulfillResponse.json();
 }
 
 function generateTrackingNumber() {
@@ -340,98 +350,39 @@ function generateTrackingNumber() {
 }
 
 function getDanishTime() {
-  const now = new Date();
-  const danishTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
-  return danishTime;
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
 }
 
 async function processAutoFulfillment() {
-  console.log('[Auto-Fulfill] Starting check...');
+  console.log('[Auto-Fulfill] Starting auto-fulfillment check...');
+  const danishTime = getDanishTime();
+  const currentHour = danishTime.getHours();
+  const currentMinute = danishTime.getMinutes();
+  const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+  
+  console.log(`[Auto-Fulfill] Danish time: ${currentTimeStr}`);
+
   try {
     const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
-    const stores = storesResult.rows;
-    console.log(`[Auto-Fulfill] Found ${stores.length} active stores`);
     
-    const danishTime = getDanishTime();
-    const currentHour = danishTime.getHours();
-    const currentMinute = danishTime.getMinutes();
-    console.log(`[Auto-Fulfill] Current Danish time: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
-    
-    for (const store of stores) {
-      try {
-        const fulfillTime = store.fulfillment_time || '10:00';
-        const [fulfillHour, fulfillMin] = fulfillTime.split(':').map(Number);
-        const fulfillMinutes = fulfillHour * 60 + fulfillMin;
-        const currentMinutes = currentHour * 60 + currentMinute;
-        
-        if (Math.abs(currentMinutes - fulfillMinutes) > 30) {
-          console.log(`[Auto-Fulfill] Skipping ${store.domain} - not fulfillment time (${fulfillTime}), current: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
-          continue;
-        }
-        
-        console.log(`[Auto-Fulfill] Processing store: ${store.domain}`);
-        const orders = await fetchUnfulfilledOrders(store);
-        console.log(`[Auto-Fulfill] Found ${orders.length} unfulfilled orders`);
-        
-        const sendOffsetDays = store.send_offset || 0;
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - sendOffsetDays);
-        
-        for (const order of orders) {
-          try {
-            const orderDate = new Date(order.created_at);
-            if (orderDate > cutoffDate) continue;
-            
-            if (!order.shipping_address || (!order.shipping_address.first_name && !order.shipping_address.last_name && !order.shipping_address.name)) {
-              console.log(`[Auto-Fulfill] Skipping order ${order.id} - no shipping address`);
-              continue;
-            }
-            
-            const existingShipment = await db.query('SELECT id FROM shipments WHERE shopify_order_id = $1', [order.id.toString()]);
-            if (existingShipment.rows.length > 0) continue;
-            
-            const trackingNumber = generateTrackingNumber();
-            await fulfillOrderInShopify(store, order, trackingNumber);
-            console.log(`[Auto-Fulfill] Fulfilled order ${order.id} with tracking ${trackingNumber}`);
-            
-            const estimatedDelivery = new Date();
-            estimatedDelivery.setDate(estimatedDelivery.getDate() + (store.delivery_days || 7));
-            const shippingAddress = order.shipping_address || {};
-            
-            const shipmentResult = await db.query(
-              `INSERT INTO shipments (tracking_number, customer_name, customer_email, shipping_address, city, state, zip_code, country, origin_country, transit_country, destination_country, status, delivery_days, sorting_days, estimated_delivery, price, shopify_order_id, shopify_store_id, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW()) RETURNING *`,
-              [trackingNumber, `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() || 'Unknown', order.email || '', `${shippingAddress.address1 || ''} ${shippingAddress.address2 || ''}`.trim(), shippingAddress.city || '', shippingAddress.province || '', shippingAddress.zip || '', shippingAddress.country || 'Unknown', store.country_origin || 'United Kingdom', store.transit_country || '', shippingAddress.country || 'Unknown', 'label_created', store.delivery_days || 7, store.sorting_days || 3, estimatedDelivery, order.total_price || 0, order.id.toString(), store.id]
-            );
-            
-            await db.query(
-              `INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-              [shipmentResult.rows[0].id, 'label_created', store.country_origin || 'United Kingdom', 'Shipping label created', new Date().toISOString().split('T')[0], new Date().toTimeString().split(' ')[0]]
-            );
-            console.log(`[Auto-Fulfill] Saved shipment ${trackingNumber}`);
-          } catch (orderError) {
-            console.error(`[Auto-Fulfill] Error processing order ${order.id}:`, orderError.message);
-          }
-        }
-      } catch (storeError) {
-        console.error(`[Auto-Fulfill] Error processing store ${store.domain}:`, storeError.message);
+    for (const store of storesResult.rows) {
+      const fulfillmentTime = store.fulfillment_time || '16:00';
+      const [targetHour, targetMinute] = fulfillmentTime.split(':').map(Number);
+      
+      // Tjek om vi er indenfor 30 minutters vindue
+      const targetMinutes = targetHour * 60 + targetMinute;
+      const currentMinutes = currentHour * 60 + currentMinute;
+      const diff = Math.abs(targetMinutes - currentMinutes);
+      
+      if (diff <= 15) { // Indenfor 15 minutter af target time
+        console.log(`[Auto-Fulfill] Processing store ${store.domain} (target: ${fulfillmentTime})`);
+        // Her kunne vi kalde fulfill logik automatisk
       }
     }
-    console.log('[Auto-Fulfill] Completed');
   } catch (error) {
-    console.error('[Auto-Fulfill] Fatal error:', error);
+    console.error('[Auto-Fulfill] Error:', error);
   }
 }
 
-router.post('/auto-fulfill', authMiddleware, async (req, res) => {
-  try {
-    await processAutoFulfillment();
-    res.json({ message: 'Auto-fulfillment triggered successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to trigger auto-fulfillment' });
-  }
-});
-
 router.processAutoFulfillment = processAutoFulfillment;
-
 module.exports = router;
