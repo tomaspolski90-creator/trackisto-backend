@@ -215,6 +215,92 @@
             line-height: 1.6;
         }
 
+        /* Sustainability Section */
+        .sustainability-section {
+            padding: 80px 24px;
+            background: #f0f8f4;
+        }
+
+        .sustainability-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .sustainability-image {
+            width: 100%;
+            height: 450px;
+            object-fit: cover;
+            border-radius: 16px;
+        }
+
+        .sustainability-content {
+            padding: 20px 0;
+        }
+
+        .sustainability-label {
+            font-size: 13px;
+            color: #2d8a5e;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .sustainability-title {
+            font-size: 38px;
+            font-weight: 700;
+            color: #0d234b;
+            margin-bottom: 24px;
+            line-height: 1.2;
+        }
+
+        .sustainability-text {
+            font-size: 16px;
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 24px;
+        }
+
+        .sustainability-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #2d8a5e;
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 15px;
+            transition: gap 0.3s;
+        }
+
+        .sustainability-link:hover {
+            gap: 12px;
+        }
+
+        .sustainability-link svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        @media (max-width: 768px) {
+            .sustainability-container {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+
+            .sustainability-image {
+                height: 300px;
+            }
+
+            .sustainability-title {
+                font-size: 28px;
+            }
+        }
+
         /* Results Section */
         .results {
             display: none;
@@ -700,6 +786,29 @@
                     <h3 class="feature-title">Real-Time Tracking</h3>
                     <p class="feature-description">Follow your shipment every step of the way. Get instant notifications and detailed tracking information directly to your device.</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sustainability Section -->
+    <section class="sustainability-section">
+        <div class="sustainability-container">
+            <img src="sustainability.png" alt="Green forest from above" class="sustainability-image">
+            <div class="sustainability-content">
+                <div class="sustainability-label">Sustainability</div>
+                <h2 class="sustainability-title">Committed to a Greener Future</h2>
+                <p class="sustainability-text">
+                    At RVS Logistics, we believe that efficient delivery shouldn't come at the cost of our planet. 
+                    Our goal is to achieve carbon-neutral shipping by 2030, and we're already making significant progress.
+                </p>
+                <p class="sustainability-text">
+                    By 2025, we aim to reduce our CO₂ emissions by 40% compared to 2020 levels through optimized 
+                    route planning, consolidated shipments, and partnerships with eco-friendly carriers.
+                </p>
+                <a href="about.html" class="sustainability-link">
+                    Learn more about our green initiatives
+                    <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                </a>
             </div>
         </div>
     </section>
