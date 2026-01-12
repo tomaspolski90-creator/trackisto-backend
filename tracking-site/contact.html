@@ -38,7 +38,23 @@
             text-decoration: none;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: #00a0d6;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
         }
 
         .nav-links {
@@ -115,8 +131,18 @@
         }
 
         .contact-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .contact-icon svg {
+            width: 48px;
+            height: 48px;
+            fill: #00a0d6;
         }
 
         .contact-method h3 {
@@ -140,6 +166,11 @@
 
         .contact-method a:hover {
             text-decoration: underline;
+        }
+
+        .contact-method span {
+            color: #666;
+            font-size: 15px;
         }
 
         .section-title {
@@ -290,7 +321,10 @@
     <header class="header">
         <div class="header-content">
             <a href="index.html" class="logo">
-                <span>📦</span> RVS Logistics
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                </div>
+                RVS Logistics
             </a>
             <nav class="nav-links">
                 <a href="index.html">Track & Trace</a>
@@ -312,24 +346,30 @@
         <div class="content-card">
             <div class="contact-grid">
                 <div class="contact-method">
-                    <div class="contact-icon">📧</div>
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    </div>
                     <h3>Email Support</h3>
                     <p>Our team typically responds within 24 hours</p>
                     <a href="mailto:support@rvslogistics.com">support@rvslogistics.com</a>
                 </div>
 
                 <div class="contact-method">
-                    <div class="contact-icon">💬</div>
-                    <h3>Live Chat</h3>
-                    <p>Chat with our support team in real-time</p>
-                    <a href="#">Available Mon-Fri, 9-17</a>
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                    </div>
+                    <h3>Business Hours</h3>
+                    <p>We're available during regular business hours</p>
+                    <span>Mon-Fri: 9:00-17:00 CET</span>
                 </div>
 
                 <div class="contact-method">
-                    <div class="contact-icon">📍</div>
-                    <h3>Visit Us</h3>
-                    <p>RVS Logistics Headquarters</p>
-                    <span style="color: #666;">Copenhagen, Denmark</span>
+                    <div class="contact-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+                    </div>
+                    <h3>Response Time</h3>
+                    <p>Average response time for all inquiries</p>
+                    <span>Within 24 hours</span>
                 </div>
             </div>
 
@@ -391,8 +431,8 @@
             </div>
             <div>
                 <h4>Contact</h4>
-                <p>📧 support@rvslogistics.com</p>
-                <p>🕐 Mon-Fri: 8:00-17:00</p>
+                <p>support@rvslogistics.com</p>
+                <p>Mon-Fri: 8:00-17:00</p>
             </div>
         </div>
         <div class="footer-bottom">
