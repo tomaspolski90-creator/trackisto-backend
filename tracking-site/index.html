@@ -791,7 +791,7 @@
     </section>
 
     <!-- Sustainability Section -->
-    <section class="sustainability-section">
+    <section class="sustainability-section" id="sustainabilitySection">
         <div class="sustainability-container">
             <img src="sustainability.png" alt="Green forest from above" class="sustainability-image">
             <div class="sustainability-content">
@@ -969,6 +969,7 @@
         function displayResults(data) {
             document.getElementById('heroSection').style.display = 'none';
             document.getElementById('featuresSection').style.display = 'none';
+            document.getElementById('sustainabilitySection').style.display = 'none';
             document.getElementById('results').classList.add('show');
 
             document.getElementById('displayTrackingNumber').textContent = data.trackingNumber;
@@ -1060,6 +1061,7 @@
         function resetSearch() {
             document.getElementById('heroSection').style.display = 'block';
             document.getElementById('featuresSection').style.display = 'block';
+            document.getElementById('sustainabilitySection').style.display = 'block';
             document.getElementById('results').classList.remove('show');
             document.getElementById('trackingInput').value = '';
             document.getElementById('errorMessage').innerHTML = '';
