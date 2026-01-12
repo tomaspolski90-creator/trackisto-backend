@@ -104,7 +104,6 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
     let allOrders = [];
 
     for (const store of stores) {
-      // ÆNDRET: Kun hent unfulfilled ordrer
       const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`, {
         headers: { 'X-Shopify-Access-Token': store.api_token }
       });
@@ -139,7 +138,7 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== FULFILLED ORDERS (NY ENDPOINT) ==========
+// ========== FULFILLED ORDERS ==========
 router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Fulfilled Orders] Fetching fulfilled orders from Shopify...');
@@ -148,7 +147,6 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
     let allOrders = [];
 
     for (const store of stores) {
-      // Hent fulfilled ordrer fra Shopify
       const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=any&fulfillment_status=shipped&limit=50`, {
         headers: { 'X-Shopify-Access-Token': store.api_token }
       });
@@ -167,7 +165,6 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
           created_at: order.created_at,
           fulfillment_status: order.fulfillment_status || 'fulfilled',
           store_domain: store.domain,
-          // Prøv at hente tracking nummer fra fulfillments
           tracking_number: order.fulfillments?.[0]?.tracking_number || null
         }));
         allOrders = [...allOrders, ...mappedOrders];
@@ -204,7 +201,6 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
           continue;
         }
 
-        // Tjek om vi allerede har oprettet shipment for denne ordre
         const existing = await db.query('SELECT id FROM shipments WHERE shopify_order_id = $1', [order.id.toString()]);
         if (existing.rows.length > 0) {
           console.log(`[Fetch-Fulfill] Skipping order ${order.id} - already processed`);
@@ -217,7 +213,6 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
           
           await fulfillOrderInShopify(store, order, trackingNumber);
           
-          // Gem shipment i database
           const shipmentResult = await db.query(`
             INSERT INTO shipments (
               tracking_number, customer_name, customer_email, shipping_address, 
@@ -246,15 +241,15 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
             store.id
           ]);
 
-          // Opret initial tracking event
+          // Opret initial tracking event (Label Created)
           await db.query(`
             INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
             VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIME, NOW())
           `, [
             shipmentResult.rows[0].id,
-            'label_created',
-            store.country_origin || 'United Kingdom',
-            'Shipping label has been created'
+            'Label Created',
+            `${store.country_origin || 'United Kingdom'}, ${store.country_origin || 'United Kingdom'}`,
+            `Label created in ${store.country_origin || 'United Kingdom'}`
           ]);
 
           console.log(`[Fetch-Fulfill] Saved shipment ${trackingNumber}`);
@@ -279,6 +274,180 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   }
 });
 
+// ========== AUTO UPDATE TRACKING EVENTS ==========
+async function updateTrackingEvents() {
+  console.log('[Auto-Events] Starting automatic tracking events update...');
+  
+  try {
+    // Hent alle aktive shipments der ikke er delivered med alle store settings
+    const shipmentsResult = await db.query(`
+      SELECT s.*, 
+             ss.country_origin, 
+             ss.transit_country, 
+             ss.delivery_days as store_delivery_days,
+             ss.sorting_days as store_sorting_days,
+             ss.parcel_point,
+             ss.parcel_point_days,
+             ss.redelivery_active,
+             ss.redelivery_days,
+             ss.attempts
+      FROM shipments s
+      LEFT JOIN shopify_stores ss ON s.shopify_store_id = ss.id
+      WHERE s.status != 'delivered'
+      ORDER BY s.created_at ASC
+    `);
+    
+    const shipments = shipmentsResult.rows;
+    console.log(`[Auto-Events] Found ${shipments.length} active shipments to check`);
+    
+    for (const shipment of shipments) {
+      await updateShipmentEvents(shipment);
+    }
+    
+    console.log('[Auto-Events] Completed tracking events update');
+  } catch (error) {
+    console.error('[Auto-Events] Error:', error);
+  }
+}
+
+async function updateShipmentEvents(shipment) {
+  const createdAt = new Date(shipment.created_at);
+  const now = new Date();
+  const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+  
+  // Hent eksisterende events for denne shipment
+  const eventsResult = await db.query(
+    'SELECT status FROM tracking_events WHERE shipment_id = $1',
+    [shipment.id]
+  );
+  const existingStatuses = eventsResult.rows.map(e => e.status);
+  
+  // Hent alle settings fra store
+  const originCountry = shipment.origin_country || shipment.country_origin || 'United Kingdom';
+  const transitCountry = shipment.transit_country || 'Netherlands';
+  const destinationCountry = shipment.destination_country || shipment.country || 'France';
+  const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 7;
+  const sortingDays = shipment.sorting_days || shipment.store_sorting_days || 3;
+  const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
+  const parcelPointDays = shipment.parcel_point_days || 3;
+  const redeliveryActive = shipment.redelivery_active === true || shipment.redelivery_active === 'Yes';
+  const redeliveryDays = shipment.redelivery_days || 3;
+  const attempts = shipment.attempts || 1;
+  
+  // Beregn dynamiske dage baseret på delivery_days og sorting_days
+  const transitDay = Math.max(1, Math.floor(sortingDays / 2));
+  const customsDay = Math.floor(deliveryDays / 2);
+  const clearedDay = customsDay + 1;
+  const outForDeliveryDay = deliveryDays - 1;
+  
+  // Definer tracking events baseret på store settings
+  const eventSchedule = [
+    {
+      day: 0,
+      status: 'Label Created',
+      location: `${originCountry}, ${originCountry}`,
+      description: `Label created in ${originCountry}`
+    },
+    {
+      day: 1,
+      status: 'Package Received',
+      location: `Export hub, ${originCountry}`,
+      description: `Package processed at export hub, ${originCountry}`
+    },
+    {
+      day: Math.min(2, transitDay + 1),
+      status: 'Departed Facility',
+      location: `${originCountry} Intl Airport`,
+      description: `Departed via ${originCountry} Intl Airport`
+    },
+    {
+      day: transitDay + 2,
+      status: 'In Transit',
+      location: `${transitCountry}`,
+      description: `In transit through ${transitCountry}`
+    },
+    {
+      day: customsDay,
+      status: 'Customs Hold',
+      location: `Customs, ${destinationCountry}`,
+      description: `Customs hold in ${destinationCountry}`
+    },
+    {
+      day: clearedDay,
+      status: 'Cleared Customs',
+      location: `Customs, ${destinationCountry}`,
+      description: `Cleared customs in ${destinationCountry}`
+    },
+    {
+      day: outForDeliveryDay,
+      status: 'Out for Delivery',
+      location: `${shipment.city || 'Local'}, ${destinationCountry}`,
+      description: `Out for delivery in ${shipment.city || 'your area'}`
+    }
+  ];
+  
+  // Tilføj parcel point event hvis aktiveret
+  if (parcelPoint) {
+    eventSchedule.push({
+      day: outForDeliveryDay + 1,
+      status: 'Available at Parcel Point',
+      location: `Parcel Point, ${shipment.city || destinationCountry}`,
+      description: `Package available for pickup at local parcel point`
+    });
+  }
+  
+  // Tilføj events der mangler baseret på hvor mange dage der er gået
+  for (const event of eventSchedule) {
+    if (daysSinceCreation >= event.day && !existingStatuses.includes(event.status)) {
+      // Beregn event dato
+      const eventDate = new Date(createdAt);
+      eventDate.setDate(eventDate.getDate() + event.day);
+      
+      // Generer tilfældig tid mellem 08:00 og 18:00
+      const hour = 8 + Math.floor(Math.random() * 10);
+      const minute = Math.floor(Math.random() * 60);
+      const eventTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      
+      await db.query(`
+        INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `, [
+        shipment.id,
+        event.status,
+        event.location,
+        event.description,
+        eventDate.toISOString().split('T')[0],
+        eventTime
+      ]);
+      
+      console.log(`[Auto-Events] Added "${event.status}" for shipment ${shipment.tracking_number}`);
+      
+      // Opdater shipment status baseret på event
+      let newStatus = 'label_created';
+      if (event.status === 'Package Received') newStatus = 'label_created';
+      else if (event.status === 'Departed Facility') newStatus = 'in_transit';
+      else if (event.status === 'In Transit') newStatus = 'in_transit';
+      else if (event.status === 'Customs Hold') newStatus = 'in_transit';
+      else if (event.status === 'Cleared Customs') newStatus = 'in_transit';
+      else if (event.status === 'Out for Delivery') newStatus = 'out_for_delivery';
+      else if (event.status === 'Available at Parcel Point') newStatus = 'out_for_delivery';
+      
+      await db.query('UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, shipment.id]);
+    }
+  }
+}
+
+// Endpoint til manuelt at trigger event updates (til test)
+router.post('/update-tracking-events', authMiddleware, async (req, res) => {
+  try {
+    await updateTrackingEvents();
+    res.json({ success: true, message: 'Tracking events updated' });
+  } catch (error) {
+    console.error('[Update Events] Error:', error);
+    res.status(500).json({ error: 'Failed to update tracking events' });
+  }
+});
+
 // ========== HELPER FUNCTIONS ==========
 
 async function fetchUnfulfilledOrders(store) {
@@ -299,7 +468,6 @@ async function fetchUnfulfilledOrders(store) {
 }
 
 async function fulfillOrderInShopify(store, order, trackingNumber) {
-  // Get fulfillment orders
   const foRes = await fetch(`https://${store.domain}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`, {
     headers: { 'X-Shopify-Access-Token': store.api_token }
   });
@@ -311,7 +479,6 @@ async function fulfillOrderInShopify(store, order, trackingNumber) {
     throw new Error('No fulfillment order found');
   }
 
-  // Create fulfillment
   const fulfillResponse = await fetch(`https://${store.domain}/admin/api/2024-01/fulfillments.json`, {
     method: 'POST',
     headers: { 
@@ -329,8 +496,8 @@ async function fulfillOrderInShopify(store, order, trackingNumber) {
         }],
         tracking_info: {
           number: trackingNumber,
-          url: `https://grand-sorbet-268b5e.netlify.app/?tracking=${trackingNumber}`,
-          company: 'Trackisto'
+          url: `https://rvslogistics.com/?tracking=${trackingNumber}`,
+          company: 'RVS Logistics'
         },
         notify_customer: true
       }
@@ -362,6 +529,9 @@ async function processAutoFulfillment() {
   
   console.log(`[Auto-Fulfill] Danish time: ${currentTimeStr}`);
 
+  // Kør også tracking events update
+  await updateTrackingEvents();
+
   try {
     const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
     
@@ -369,14 +539,12 @@ async function processAutoFulfillment() {
       const fulfillmentTime = store.fulfillment_time || '16:00';
       const [targetHour, targetMinute] = fulfillmentTime.split(':').map(Number);
       
-      // Tjek om vi er indenfor 30 minutters vindue
       const targetMinutes = targetHour * 60 + targetMinute;
       const currentMinutes = currentHour * 60 + currentMinute;
       const diff = Math.abs(targetMinutes - currentMinutes);
       
-      if (diff <= 15) { // Indenfor 15 minutter af target time
+      if (diff <= 15) {
         console.log(`[Auto-Fulfill] Processing store ${store.domain} (target: ${fulfillmentTime})`);
-        // Her kunne vi kalde fulfill logik automatisk
       }
     }
   } catch (error) {
@@ -385,4 +553,5 @@ async function processAutoFulfillment() {
 }
 
 router.processAutoFulfillment = processAutoFulfillment;
+router.updateTrackingEvents = updateTrackingEvents;
 module.exports = router;
