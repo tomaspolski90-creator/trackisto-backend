@@ -22,6 +22,11 @@ function App() {
   });
   const [pasteUrl, setPasteUrl] = useState('');
   
+  // Dashboard tabs and pending orders
+  const [dashboardTab, setDashboardTab] = useState('recent');
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  
   // Manual Entry Form State
   const [manualForm, setManualForm] = useState({
     customer_name: '',
@@ -68,6 +73,25 @@ function App() {
       if (storesRes.ok) { const data = await storesRes.json(); setStores(data.stores || []); }
     } catch (error) { console.error('Error fetching dashboard data:', error); }
   }, [token]);
+
+  // Fetch pending orders from Shopify
+  const fetchPendingOrders = async () => {
+    setPendingLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/shopify/pending-orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingOrders(data.orders || []);
+        // Update pending count in stats
+        setDashboardStats(prev => ({ ...prev, pending: data.orders?.length || 0 }));
+      }
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
+    }
+    setPendingLoading(false);
+  };
 
   useEffect(() => {
     if (token) { setIsLoggedIn(true); fetchDashboardData(); }
@@ -311,24 +335,98 @@ function App() {
             <div className="stats-grid">
               <div className="stat-card blue"><h3>TOTAL SHIPMENTS</h3><p className="stat-number">{dashboardStats.total}</p></div>
               <div className="stat-card green"><h3>TODAY'S SHIPMENTS</h3><p className="stat-number">{dashboardStats.today}</p></div>
-              <div className="stat-card orange"><h3>PENDING ORDERS</h3><p className="stat-number">{dashboardStats.pending}</p></div>
+              <div className="stat-card orange"><h3>PENDING ORDERS</h3><p className="stat-number">{pendingOrders.length}</p></div>
             </div>
-            <div className="recent-shipments">
-              <h2>Recent Shipments</h2>
-              <table>
-                <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
-                <tbody>
-                  {shipments.slice(0, 10).map(s => (
-                    <tr key={s.id}>
-                      <td>{s.tracking_number}</td><td>{s.customer_name}</td><td>{s.country}</td>
-                      <td><span className={`status ${s.status}`}>{s.status}</span></td>
-                      <td>{new Date(s.created_at).toLocaleDateString()}</td>
-                      <td><button className="btn-small">View</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            
+            {/* Dashboard Tabs */}
+            <div className="dashboard-tabs">
+              <button 
+                className={`tab-btn ${dashboardTab === 'recent' ? 'active' : ''}`}
+                onClick={() => setDashboardTab('recent')}
+              >
+                Recent Shipments
+              </button>
+              <button 
+                className={`tab-btn ${dashboardTab === 'pending' ? 'active' : ''}`}
+                onClick={() => { setDashboardTab('pending'); if (pendingOrders.length === 0) fetchPendingOrders(); }}
+              >
+                Pending Shipments
+              </button>
+              <button 
+                className="fetch-btn"
+                onClick={fetchPendingOrders}
+                disabled={pendingLoading}
+              >
+                <span className="fetch-icon">⬇</span>
+                {pendingLoading ? 'Fetching...' : 'Fetch Pending Parcels'}
+              </button>
             </div>
+
+            {/* Recent Shipments Tab */}
+            {dashboardTab === 'recent' && (
+              <div className="recent-shipments">
+                <table>
+                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                  <tbody>
+                    {shipments.slice(0, 10).map(s => (
+                      <tr key={s.id}>
+                        <td>{s.tracking_number}</td><td>{s.customer_name}</td><td>{s.country}</td>
+                        <td><span className={`status ${s.status}`}>{s.status}</span></td>
+                        <td>{new Date(s.created_at).toLocaleDateString()}</td>
+                        <td><button className="btn-small">View</button></td>
+                      </tr>
+                    ))}
+                    {shipments.length === 0 && (
+                      <tr><td colSpan="6" className="no-data">No shipments yet</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pending Shipments Tab */}
+            {dashboardTab === 'pending' && (
+              <div className="pending-shipments">
+                {pendingLoading ? (
+                  <div className="loading-state">Loading pending orders...</div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ORDER #</th>
+                        <th>CUSTOMER</th>
+                        <th>COUNTRY</th>
+                        <th>AMOUNT</th>
+                        <th>ORDER DATE</th>
+                        <th>FULFILLMENT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingOrders.map(order => (
+                        <tr key={order.id}>
+                          <td>#{order.order_number}</td>
+                          <td>{order.customer_name}</td>
+                          <td>{order.country}</td>
+                          <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
+                          <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <span className={`fulfillment-status ${order.fulfillment_status}`}>
+                              {order.fulfillment_status || 'unfulfilled'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {pendingOrders.length === 0 && (
+                        <tr><td colSpan="6" className="no-data">No pending orders. Click "Fetch Pending Parcels" to load.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+                <div className="pending-info">
+                  <p>Pending Shipments (Page 1 of 1)</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
