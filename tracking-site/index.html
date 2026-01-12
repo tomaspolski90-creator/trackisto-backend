@@ -363,28 +363,27 @@
         .barcode-container {
             display: inline-block;
             background: white;
-            padding: 15px 20px 10px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
+            padding: 10px 15px 8px;
         }
 
         #barcodeCanvas {
             display: block;
+            height: 45px;
         }
 
         .barcode-text {
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 600;
             color: #000;
-            margin-top: 8px;
-            letter-spacing: 2px;
+            margin-top: 5px;
+            letter-spacing: 1px;
         }
 
         .barcode-label {
-            font-size: 12px;
+            font-size: 10px;
             color: #666;
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
         /* Actions Row */
@@ -1119,8 +1118,8 @@
             const ctx = canvas.getContext('2d');
             
             // Code 128 encoding (simplified version)
-            const barWidth = 2;
-            const height = 60;
+            const barWidth = 1.5;
+            const height = 40;
             
             // Generate pattern from text
             let pattern = '11010010000'; // Start code B
