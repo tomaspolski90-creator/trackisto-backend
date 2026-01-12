@@ -105,7 +105,7 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
       
       try {
         const response = await fetch(
-          `https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`,
+          `https://${store.domain}/admin/api/2024-01/orders.json?status=any&limit=50`,
           { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
         );
         
