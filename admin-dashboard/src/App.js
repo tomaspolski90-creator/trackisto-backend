@@ -427,19 +427,21 @@ function App() {
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading fulfilled orders...</div>) : (
                   <table>
-                    <thead><tr><th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>ORDER DATE</th><th>FULFILLMENT</th></tr></thead>
+                    <thead><tr><th>ORDER #</th><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>ORDER DATE</th><th>FULFILLMENT</th><th>ACTIONS</th></tr></thead>
                     <tbody>
                       {filteredFulfilledOrders.map(order => (
                         <tr key={order.id}>
                           <td>#{order.order_number}</td>
+                          <td>{order.tracking_number || '-'}</td>
                           <td>{order.customer_name}</td>
                           <td>{order.country}</td>
                           <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
                           <td>{new Date(order.created_at).toLocaleDateString()}</td>
                           <td><span className="fulfillment-status fulfilled">fulfilled</span></td>
+                          <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://grand-sorbet-268b5e.netlify.app/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
                         </tr>
                       ))}
-                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="6" className="no-data">No fulfilled orders found. Click "Refresh" to load.</td></tr>)}
+                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="8" className="no-data">No fulfilled orders found. Click "Refresh" to load.</td></tr>)}
                     </tbody>
                   </table>
                 )}
