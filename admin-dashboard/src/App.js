@@ -11,19 +11,18 @@ function App() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
+  // Navigation state
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
   // Dashboard state
-  const [dashboardTab, setDashboardTab] = useState('recent'); // 'recent', 'pending', 'fulfilled'
+  const [dashboardTab, setDashboardTab] = useState('recent');
   const [shipments, setShipments] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
-  const [fulfilledOrders, setFulfilledOrders] = useState([]); // NY STATE
+  const [fulfilledOrders, setFulfilledOrders] = useState([]);
   const [stores, setStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState('all');
   const [stats, setStats] = useState({ total: 0, today: 0, pending: 0 });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // Navigation state
-  const [currentPage, setCurrentPage] = useState('dashboard'); // 'dashboard', 'stores', 'settings'
 
   // Check auth on mount
   useEffect(() => {
@@ -110,7 +109,7 @@ function App() {
         fetchStats(),
         fetchStores(),
         fetchPendingOrders(),
-        fetchFulfilledOrders() // NY FETCH
+        fetchFulfilledOrders()
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -161,7 +160,6 @@ function App() {
     }
   };
 
-  // OPDATERET: Henter kun unfulfilled ordrer
   const fetchPendingOrders = async () => {
     try {
       const response = await fetch(`${API_URL}/api/shopify/pending-orders`, {
@@ -170,7 +168,6 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setPendingOrders(data.orders || []);
-        // Opdater pending count i stats
         setStats(prev => ({ ...prev, pending: (data.orders || []).length }));
       }
     } catch (error) {
@@ -178,7 +175,6 @@ function App() {
     }
   };
 
-  // NY FUNKTION: Henter fulfilled ordrer
   const fetchFulfilledOrders = async () => {
     try {
       const response = await fetch(`${API_URL}/api/shopify/fulfilled-orders`, {
@@ -199,7 +195,6 @@ function App() {
     }
 
     setLoading(true);
-    setError('');
 
     try {
       const response = await fetch(`${API_URL}/api/shopify/fetch-and-fulfill`, {
@@ -211,14 +206,13 @@ function App() {
 
       if (response.ok) {
         alert(`Success! Fulfilled ${data.fulfilled} orders.`);
-        // Refresh all data
         await fetchDashboardData();
       } else {
-        setError(data.error || 'Failed to fulfill orders');
+        alert(data.error || 'Failed to fulfill orders');
       }
     } catch (error) {
       console.error('Error fulfilling orders:', error);
-      setError('Connection error. Please try again.');
+      alert('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -241,7 +235,6 @@ function App() {
     return `${currency} ${parseFloat(amount).toFixed(2)}`;
   };
 
-  // Filter orders by selected store
   const filterByStore = (orders) => {
     if (selectedStore === 'all') return orders;
     return orders.filter(order => order.store_domain === selectedStore);
@@ -253,7 +246,7 @@ function App() {
       <div className="login-container">
         <div className="login-box">
           <h1>🚚 Trackisto</h1>
-          <h2>Admin Login</h2>
+          <p>Admin Dashboard</p>
           
           <form onSubmit={handleLogin}>
             <div className="form-group">
@@ -278,280 +271,395 @@ function App() {
               />
             </div>
 
-            {loginError && <div className="error-message">{loginError}</div>}
+            {loginError && <p style={{ color: 'red', marginBottom: '15px' }}>{loginError}</p>}
 
-            <button type="submit" className="login-btn" disabled={loading}>
+            <button type="submit" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
+          
+          <p className="hint">Demo: admin / admin123</p>
         </div>
       </div>
     );
   }
 
-  // Dashboard
+  // Main App with Sidebar
   return (
     <div className="app">
-      {/* Header */}
-      <header className="header">
-        <div className="header-left">
-          <h1>🚚 Trackisto</h1>
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="logo">
+          <h2>🚚 Trackisto</h2>
         </div>
-        <nav className="header-nav">
-          <button 
+        
+        <p className="nav-title">Navigation</p>
+        <ul className="nav-menu">
+          <li 
             className={currentPage === 'dashboard' ? 'active' : ''} 
             onClick={() => setCurrentPage('dashboard')}
           >
-            Dashboard
-          </button>
-          <button 
+            📊 Dashboard
+          </li>
+          <li 
+            className={currentPage === 'shipments' ? 'active' : ''} 
+            onClick={() => setCurrentPage('shipments')}
+          >
+            📦 All Shipments
+          </li>
+          <li 
             className={currentPage === 'stores' ? 'active' : ''} 
             onClick={() => setCurrentPage('stores')}
           >
-            Stores
+            🏪 Shopify Stores
+          </li>
+          <li 
+            className={currentPage === 'manual' ? 'active' : ''} 
+            onClick={() => setCurrentPage('manual')}
+          >
+            ✏️ Manual Entry
+          </li>
+        </ul>
+
+        <div className="nav-bottom">
+          <div className="user-info">
+            Logged in as: {user?.username}
+          </div>
+          <button className="logout-btn" onClick={handleLogout}>
+            Logout
           </button>
-        </nav>
-        <div className="header-right">
-          <span>Welcome, {user?.username}</span>
-          <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
-      <main className="main-content">
-        {error && <div className="error-banner">{error}</div>}
-
+      <div className="main-content">
+        
+        {/* Dashboard Page */}
         {currentPage === 'dashboard' && (
           <>
-            <h2>Dashboard Overview</h2>
+            <h1>Dashboard Overview</h1>
 
             {/* Stats Cards */}
             <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-label">TOTAL SHIPMENTS</div>
-                <div className="stat-value">{stats.total}</div>
+              <div className="stat-card blue">
+                <h3>Total Shipments</h3>
+                <div className="stat-number">{stats.total}</div>
               </div>
-              <div className="stat-card">
-                <div className="stat-label">TODAY'S SHIPMENTS</div>
-                <div className="stat-value">{stats.today}</div>
+              <div className="stat-card green">
+                <h3>Today's Shipments</h3>
+                <div className="stat-number">{stats.today}</div>
               </div>
-              <div className="stat-card pending">
-                <div className="stat-label">PENDING ORDERS</div>
-                <div className="stat-value">{pendingOrders.length}</div>
+              <div className="stat-card orange">
+                <h3>Pending Orders</h3>
+                <div className="stat-number">{pendingOrders.length}</div>
               </div>
             </div>
 
-            {/* Tab Navigation - OPDATERET MED 3 TABS */}
+            {/* Dashboard Tabs */}
             <div className="dashboard-tabs">
               <button 
-                className={dashboardTab === 'recent' ? 'active' : ''} 
+                className={`tab-btn ${dashboardTab === 'recent' ? 'active' : ''}`}
                 onClick={() => setDashboardTab('recent')}
               >
                 Recent Shipments
               </button>
               <button 
-                className={dashboardTab === 'pending' ? 'active' : ''} 
+                className={`tab-btn ${dashboardTab === 'pending' ? 'active' : ''}`}
                 onClick={() => setDashboardTab('pending')}
               >
                 Pending Shipments
               </button>
               <button 
-                className={dashboardTab === 'fulfilled' ? 'active' : ''} 
+                className={`tab-btn ${dashboardTab === 'fulfilled' ? 'active' : ''}`}
                 onClick={() => setDashboardTab('fulfilled')}
               >
                 Fulfilled Shipments
               </button>
 
-              <select 
-                value={selectedStore} 
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="store-filter"
-              >
-                <option value="all">All Stores</option>
-                {stores.map(s => (
-                  <option key={s.id} value={s.domain}>{s.domain}</option>
-                ))}
-              </select>
+              <div className="store-filter">
+                <select 
+                  value={selectedStore} 
+                  onChange={(e) => setSelectedStore(e.target.value)}
+                >
+                  <option value="all">All Stores</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.domain}>{s.domain}</option>
+                  ))}
+                </select>
+              </div>
 
-              <button onClick={fetchDashboardData} className="refresh-btn" disabled={loading}>
+              <button 
+                className="refresh-btn" 
+                onClick={fetchDashboardData} 
+                disabled={loading}
+              >
                 🔄 Refresh
               </button>
 
               {dashboardTab === 'pending' && (
                 <button 
-                  onClick={fetchAndFulfillOrders} 
                   className="fetch-btn"
+                  onClick={fetchAndFulfillOrders}
                   disabled={loading || pendingOrders.length === 0}
                 >
-                  ⬇ Fetch Pending Parcels
+                  <span className="fetch-icon">⬇</span>
+                  Fetch Pending Parcels
                 </button>
               )}
             </div>
 
             {/* Recent Shipments Tab */}
             {dashboardTab === 'recent' && (
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>TRACKING #</th>
-                      <th>CUSTOMER</th>
-                      <th>COUNTRY</th>
-                      <th>STATUS</th>
-                      <th>CREATED</th>
-                      <th>ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shipments.length === 0 ? (
+              <div className="recent-shipments">
+                <h2>Recent Shipments</h2>
+                {shipments.length === 0 ? (
+                  <p className="no-data">No shipments found</p>
+                ) : (
+                  <table>
+                    <thead>
                       <tr>
-                        <td colSpan="6" className="empty-state">No shipments found</td>
+                        <th>Tracking #</th>
+                        <th>Customer</th>
+                        <th>Country</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
                       </tr>
-                    ) : (
-                      shipments.map(shipment => (
+                    </thead>
+                    <tbody>
+                      {shipments.map(shipment => (
                         <tr key={shipment.id}>
-                          <td className="tracking-number">{shipment.tracking_number}</td>
+                          <td>{shipment.tracking_number}</td>
                           <td>{shipment.customer_name}</td>
                           <td>{shipment.country}</td>
                           <td>
-                            <span className={`status-badge ${shipment.status}`}>
+                            <span className={`status ${shipment.status}`}>
                               {shipment.status}
                             </span>
                           </td>
                           <td>{formatDate(shipment.created_at)}</td>
                           <td>
                             <button 
-                              className="view-btn"
+                              className="btn-small"
                               onClick={() => window.open(`https://grand-sorbet-268b5e.netlify.app/?tracking=${shipment.tracking_number}`, '_blank')}
                             >
                               View
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* Pending Shipments Tab - OPDATERET */}
+            {/* Pending Shipments Tab */}
             {dashboardTab === 'pending' && (
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>ORDER #</th>
-                      <th>CUSTOMER</th>
-                      <th>COUNTRY</th>
-                      <th>AMOUNT</th>
-                      <th>ORDER DATE</th>
-                      <th>STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filterByStore(pendingOrders).length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="empty-state">
-                          🎉 No pending orders - all orders are fulfilled!
-                        </td>
-                      </tr>
-                    ) : (
-                      filterByStore(pendingOrders).map(order => (
-                        <tr key={order.id}>
-                          <td>#{order.order_number}</td>
-                          <td>{order.customer_name}</td>
-                          <td>{order.country}</td>
-                          <td>{formatCurrency(order.total_price, order.currency)}</td>
-                          <td>{formatDate(order.created_at)}</td>
-                          <td>
-                            <span className="status-badge unfulfilled">
-                              unfulfilled
-                            </span>
-                          </td>
+              <div className="pending-shipments">
+                <h2>Pending Shipments (Unfulfilled Orders)</h2>
+                {loading ? (
+                  <p className="loading-state">Loading...</p>
+                ) : filterByStore(pendingOrders).length === 0 ? (
+                  <p className="no-data">🎉 No pending orders - all orders are fulfilled!</p>
+                ) : (
+                  <>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Order #</th>
+                          <th>Customer</th>
+                          <th>Country</th>
+                          <th>Amount</th>
+                          <th>Order Date</th>
+                          <th>Fulfillment</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {filterByStore(pendingOrders).map(order => (
+                          <tr key={order.id}>
+                            <td>#{order.order_number}</td>
+                            <td>{order.customer_name}</td>
+                            <td>{order.country}</td>
+                            <td>{formatCurrency(order.total_price, order.currency)}</td>
+                            <td>{formatDate(order.created_at)}</td>
+                            <td>
+                              <span className="fulfillment-status unfulfilled">
+                                unfulfilled
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="pending-info">
+                      Showing {filterByStore(pendingOrders).length} unfulfilled orders
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
-            {/* Fulfilled Shipments Tab - NY TAB */}
+            {/* Fulfilled Shipments Tab */}
             {dashboardTab === 'fulfilled' && (
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>ORDER #</th>
-                      <th>CUSTOMER</th>
-                      <th>COUNTRY</th>
-                      <th>AMOUNT</th>
-                      <th>ORDER DATE</th>
-                      <th>FULFILLMENT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filterByStore(fulfilledOrders).length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="empty-state">No fulfilled orders found</td>
-                      </tr>
-                    ) : (
-                      filterByStore(fulfilledOrders).map(order => (
-                        <tr key={order.id}>
-                          <td>#{order.order_number}</td>
-                          <td>{order.customer_name}</td>
-                          <td>{order.country}</td>
-                          <td>{formatCurrency(order.total_price, order.currency)}</td>
-                          <td>{formatDate(order.created_at)}</td>
-                          <td>
-                            <span className="status-badge fulfilled">
-                              fulfilled
-                            </span>
-                          </td>
+              <div className="pending-shipments">
+                <h2>Fulfilled Shipments</h2>
+                {loading ? (
+                  <p className="loading-state">Loading...</p>
+                ) : filterByStore(fulfilledOrders).length === 0 ? (
+                  <p className="no-data">No fulfilled orders found</p>
+                ) : (
+                  <>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Order #</th>
+                          <th>Customer</th>
+                          <th>Country</th>
+                          <th>Amount</th>
+                          <th>Order Date</th>
+                          <th>Fulfillment</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {filterByStore(fulfilledOrders).map(order => (
+                          <tr key={order.id}>
+                            <td>#{order.order_number}</td>
+                            <td>{order.customer_name}</td>
+                            <td>{order.country}</td>
+                            <td>{formatCurrency(order.total_price, order.currency)}</td>
+                            <td>{formatDate(order.created_at)}</td>
+                            <td>
+                              <span className="fulfillment-status fulfilled">
+                                fulfilled
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="pending-info">
+                      Showing {filterByStore(fulfilledOrders).length} fulfilled orders
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </>
+        )}
+
+        {/* All Shipments Page */}
+        {currentPage === 'shipments' && (
+          <div className="shipments">
+            <h1>All Shipments</h1>
+            {shipments.length === 0 ? (
+              <p className="no-data">No shipments found</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tracking #</th>
+                    <th>Customer</th>
+                    <th>Email</th>
+                    <th>Country</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shipments.map(shipment => (
+                    <tr key={shipment.id}>
+                      <td>{shipment.tracking_number}</td>
+                      <td>{shipment.customer_name}</td>
+                      <td>{shipment.customer_email || '-'}</td>
+                      <td>{shipment.country}</td>
+                      <td>
+                        <span className={`status ${shipment.status}`}>
+                          {shipment.status}
+                        </span>
+                      </td>
+                      <td>{formatDate(shipment.created_at)}</td>
+                      <td>
+                        <button 
+                          className="btn-small"
+                          onClick={() => window.open(`https://grand-sorbet-268b5e.netlify.app/?tracking=${shipment.tracking_number}`, '_blank')}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         )}
 
         {/* Stores Page */}
         {currentPage === 'stores' && (
-          <>
-            <h2>Connected Stores</h2>
-            
-            <button onClick={connectShopify} className="connect-btn">
-              + Connect Shopify Store
+          <div className="shopify-settings">
+            <h1>Shopify Stores</h1>
+            <p className="description">Connect and manage your Shopify stores</p>
+
+            <button className="btn-add-store" onClick={connectShopify}>
+              + Connect New Shopify Store
             </button>
 
-            <div className="stores-grid">
+            <div className="stores-table">
+              <h2>Connected Stores</h2>
               {stores.length === 0 ? (
-                <div className="empty-state">No stores connected yet</div>
+                <p className="no-stores">No stores connected yet</p>
               ) : (
-                stores.map(store => (
-                  <div key={store.id} className="store-card">
-                    <div className="store-header">
-                      <h3>{store.domain}</h3>
-                      <span className={`status-indicator ${store.status}`}>
-                        {store.status}
-                      </span>
-                    </div>
-                    <div className="store-details">
-                      <p><strong>Delivery Days:</strong> {store.delivery_days || 7}</p>
-                      <p><strong>Fulfillment Time:</strong> {store.fulfillment_time || '16:00'}</p>
-                      <p><strong>Origin:</strong> {store.country_origin || 'United Kingdom'}</p>
-                    </div>
-                  </div>
-                ))
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Store Domain</th>
+                      <th>Delivery Days</th>
+                      <th>Fulfillment Time</th>
+                      <th>Origin Country</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stores.map(store => (
+                      <tr key={store.id}>
+                        <td>{store.domain}</td>
+                        <td>{store.delivery_days || 7}</td>
+                        <td>{store.fulfillment_time || '16:00'}</td>
+                        <td>{store.country_origin || 'United Kingdom'}</td>
+                        <td>
+                          <span className={`status-indicator ${store.status || 'active'}`}>
+                            {store.status === 'active' ? '✓' : '✗'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
-          </>
+          </div>
         )}
-      </main>
+
+        {/* Manual Entry Page */}
+        {currentPage === 'manual' && (
+          <div className="manual-entry">
+            <h1>Manual Shipment Entry</h1>
+            <div className="manual-entry-container">
+              <div className="manual-entry-info">
+                <p><strong>Manual Entry:</strong> Use this form to create shipments manually without Shopify integration.</p>
+                <p>This is useful for orders from other platforms or custom shipments.</p>
+              </div>
+              
+              <div className="manual-form">
+                <p className="no-data">Manual entry form coming soon...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
