@@ -75,6 +75,20 @@
             color: #00a0d6;
         }
 
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .mobile-menu-btn svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+        }
+
         /* Hero Section */
         .hero {
             background: linear-gradient(135deg, #00a0d6 0%, #0d234b 100%);
@@ -734,6 +748,27 @@
         @media (max-width: 768px) {
             .nav-links {
                 display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: #0d234b;
+                flex-direction: column;
+                padding: 20px;
+                gap: 16px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+            }
+
+            .nav-links.show {
+                display: flex;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .header-content {
+                position: relative;
             }
 
             .hero h1 {
@@ -779,12 +814,15 @@
                 </div>
                 RVS Logistics
             </a>
-            <nav class="nav-links">
+            <nav class="nav-links" id="navLinks">
                 <a href="index.html">Track & Trace</a>
                 <a href="about.html">About Us</a>
                 <a href="faq.html">FAQ</a>
                 <a href="contact.html">Contact</a>
             </nav>
+            <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">
+                <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
         </div>
     </header>
 
@@ -1118,7 +1156,7 @@
             const ctx = canvas.getContext('2d');
             
             // Code 128 encoding (simplified version)
-            const barWidth = 1.5;
+            const barWidth = 1.2;
             const height = 40;
             
             // Generate pattern from text
@@ -1229,6 +1267,11 @@
             currentTrackingNumber = '';
             // Clear URL parameter
             window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        function toggleMobileMenu() {
+            const navLinks = document.getElementById('navLinks');
+            navLinks.classList.toggle('show');
         }
     </script>
 </body>
