@@ -236,69 +236,86 @@
 
         /* Sustainability Section */
         .sustainability-section {
-            padding: 80px 24px;
-            background: #e8f5e9;
+            padding: 60px 0;
+            background: #ffffff;
         }
 
-        .sustainability-container {
+        .sustainability-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .sustainability-header h2 {
+            font-size: 42px;
+            font-weight: 700;
+            color: #0d234b;
+        }
+
+        .sustainability-wrapper {
+            background: #e8f5e9;
+            border-radius: 24px;
             max-width: 1200px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 60px;
-            align-items: center;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            min-height: 500px;
         }
 
-        .sustainability-image-wrapper {
+        .sustainability-image-container {
             position: relative;
         }
 
         .sustainability-image {
             width: 100%;
-            height: 420px;
+            height: 100%;
             object-fit: cover;
-            border-radius: 0 200px 200px 0;
-            margin-left: -24px;
-            width: calc(100% + 24px);
+            border-radius: 24px;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
 
         .sustainability-content {
-            padding: 20px 40px 20px 0;
+            padding: 60px 60px 60px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .sustainability-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #333;
             text-transform: uppercase;
             letter-spacing: 2px;
             font-weight: 600;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .sustainability-title {
-            font-size: 42px;
+            font-size: 44px;
             font-weight: 700;
             color: #0d234b;
-            margin-bottom: 24px;
-            line-height: 1.15;
+            margin-bottom: 28px;
+            line-height: 1.1;
         }
 
         .sustainability-text {
             font-size: 16px;
-            color: #444;
-            line-height: 1.8;
-            margin-bottom: 24px;
+            color: #333;
+            line-height: 1.7;
+            margin-bottom: 20px;
         }
 
         .sustainability-link {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            color: #2d8a5e;
+            color: #0077a3;
             font-weight: 600;
             text-decoration: none;
             font-size: 15px;
-            transition: gap 0.3s;
+            margin-top: 10px;
         }
 
         .sustainability-link:hover {
@@ -312,23 +329,29 @@
         }
 
         @media (max-width: 768px) {
-            .sustainability-container {
+            .sustainability-wrapper {
                 grid-template-columns: 1fr;
-                gap: 32px;
+                margin: 0 20px;
+            }
+
+            .sustainability-image-container {
+                height: 280px;
             }
 
             .sustainability-image {
-                height: 280px;
-                border-radius: 0 100px 100px 0;
-                margin-left: -24px;
-                width: calc(100% + 24px);
+                position: relative;
+                border-radius: 24px 24px 0 0;
             }
 
             .sustainability-content {
-                padding: 0 20px;
+                padding: 30px;
             }
 
             .sustainability-title {
+                font-size: 28px;
+            }
+
+            .sustainability-header h2 {
                 font-size: 28px;
             }
         }
@@ -899,11 +922,16 @@
 
     <!-- Sustainability Section -->
     <section class="sustainability-section" id="sustainabilitySection">
-        <div class="sustainability-container">
-            <img src="sustainability.png" alt="Green forest from above" class="sustainability-image">
+        <div class="sustainability-header">
+            <h2>Sustainability</h2>
+        </div>
+        <div class="sustainability-wrapper">
+            <div class="sustainability-image-container">
+                <img src="sustainability.png" alt="Green forest from above" class="sustainability-image">
+            </div>
             <div class="sustainability-content">
                 <div class="sustainability-label">Sustainability</div>
-                <h2 class="sustainability-title">Committed to a Greener Future</h2>
+                <h3 class="sustainability-title">Committed to a Greener Future</h3>
                 <p class="sustainability-text">
                     At RVS Logistics, we believe that efficient delivery shouldn't come at the cost of our planet. 
                     Our goal is to achieve carbon-neutral shipping by 2030, and we're already making significant progress.
@@ -913,6 +941,10 @@
                     carriers who prioritize electric vehicles, bike couriers in urban areas, and fuel-efficient 
                     delivery routes — helping reduce the environmental footprint of every shipment.
                 </p>
+                <a href="about.html" class="sustainability-link">
+                    Learn more about our green initiatives
+                    <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+                </a>
             </div>
         </div>
     </section>
