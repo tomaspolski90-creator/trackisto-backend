@@ -91,7 +91,7 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Get pending orders from all connected Shopify stores
+// Get pending orders from all connected Shopify stores (ONLY UNFULFILLED)
 router.get('/pending-orders', authMiddleware, async (req, res) => {
   try {
     const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
@@ -101,8 +101,9 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
     
     for (const store of stores) {
       try {
+        // Only fetch UNFULFILLED orders
         const response = await fetch(
-          `https://${store.domain}/admin/api/2024-01/orders.json?status=any&limit=50`,
+          `https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`,
           { headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' } }
         );
         
