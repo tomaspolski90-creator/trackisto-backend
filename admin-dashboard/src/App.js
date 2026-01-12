@@ -22,35 +22,21 @@ function App() {
   });
   const [pasteUrl, setPasteUrl] = useState('');
   
-  // Dashboard tabs and pending orders
   const [dashboardTab, setDashboardTab] = useState('recent');
   const [pendingOrders, setPendingOrders] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('all');
   
-  // Manual Entry Form State
   const [manualForm, setManualForm] = useState({
-    customer_name: '',
-    customer_email: '',
-    shipping_address: '',
-    city: '',
-    state: '',
-    zip_code: '',
-    country: '',
-    delivery_days: 7,
-    country_origin: '',
-    transit_country: '',
-    sorting_days: 3,
-    post_delivery_event: 'Redelivery',
-    redelivery_days: 3,
-    attempts: 1
+    customer_name: '', customer_email: '', shipping_address: '', city: '', state: '', zip_code: '',
+    country: '', delivery_days: 7, country_origin: '', transit_country: '', sorting_days: 3,
+    post_delivery_event: 'Redelivery', redelivery_days: 3, attempts: 1
   });
   const [generatedTracking, setGeneratedTracking] = useState(null);
 
   const countries = [
-    'Denmark', 'United Kingdom', 'Germany', 'Netherlands', 'France', 
-    'Belgium', 'Italy', 'Spain', 'Poland', 'Sweden', 'Norway',
-    'Austria', 'Switzerland', 'Ireland', 'Portugal', 'Czech Republic',
+    'Denmark', 'United Kingdom', 'Germany', 'Netherlands', 'France', 'Belgium', 'Italy', 'Spain',
+    'Poland', 'Sweden', 'Norway', 'Austria', 'Switzerland', 'Ireland', 'Portugal', 'Czech Republic',
     'Finland', 'Greece', 'Hungary', 'Romania', 'United States', 'Canada'
   ];
 
@@ -75,7 +61,6 @@ function App() {
     } catch (error) { console.error('Error fetching dashboard data:', error); }
   }, [token]);
 
-  // Fetch pending orders from Shopify
   const fetchPendingOrders = async (storeFilter = selectedStore) => {
     setPendingLoading(true);
     try {
@@ -85,7 +70,6 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setPendingOrders(data.orders || []);
-        // Update pending count in stats
         setDashboardStats(prev => ({ ...prev, pending: data.orders?.length || 0 }));
       }
     } catch (error) {
@@ -94,12 +78,37 @@ function App() {
     setPendingLoading(false);
   };
 
-  // Filter pending orders by selected store
+  const fetchAndFulfillOrders = async () => {
+    if (!window.confirm('This will fulfill ALL pending orders and send tracking emails to customers. Continue?')) {
+      return;
+    }
+    
+    setPendingLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/shopify/fetch-and-fulfill`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ ${data.message}`);
+        fetchDashboardData();
+        fetchPendingOrders();
+      } else {
+        const data = await response.json();
+        alert('Failed to fulfill orders: ' + data.message);
+      }
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+    setPendingLoading(false);
+  };
+
   const filteredPendingOrders = selectedStore === 'all' 
     ? pendingOrders 
     : pendingOrders.filter(order => order.store_domain === selectedStore);
 
-  // Filter shipments by selected store
   const filteredShipments = selectedStore === 'all'
     ? shipments
     : shipments.filter(s => {
@@ -207,83 +216,47 @@ function App() {
     } catch (error) { console.error('Failed to toggle store status:', error); }
   };
 
-  // Generate tracking number based on country
   const generateTrackingNumber = (country) => {
-    const countryCode = country === 'Denmark' ? 'DK' : 
-                        country === 'United Kingdom' ? 'UK' :
-                        country === 'Germany' ? 'DE' :
-                        country === 'Netherlands' ? 'NL' :
-                        country === 'France' ? 'FR' :
-                        country === 'Sweden' ? 'SE' :
-                        country === 'Norway' ? 'NO' :
-                        country === 'United States' ? 'US' : 'XX';
+    const countryCode = country === 'Denmark' ? 'DK' : country === 'United Kingdom' ? 'UK' :
+      country === 'Germany' ? 'DE' : country === 'Netherlands' ? 'NL' : country === 'France' ? 'FR' :
+      country === 'Sweden' ? 'SE' : country === 'Norway' ? 'NO' : country === 'United States' ? 'US' : 'XX';
     return countryCode + Date.now() + Math.floor(Math.random() * 1000);
   };
 
-  // Handle Manual Entry Submit
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
     try {
       const trackingNumber = generateTrackingNumber(manualForm.country);
       const estimatedDelivery = new Date();
       estimatedDelivery.setDate(estimatedDelivery.getDate() + manualForm.delivery_days);
 
       const shipmentData = {
-        tracking_number: trackingNumber,
-        customer_name: manualForm.customer_name,
-        customer_email: manualForm.customer_email,
-        shipping_address: manualForm.shipping_address,
-        city: manualForm.city,
-        state: manualForm.state,
-        zip_code: manualForm.zip_code,
-        country: manualForm.country,
-        origin_country: manualForm.country_origin,
-        transit_country: manualForm.transit_country,
-        destination_country: manualForm.country,
-        status: 'label_created',
-        delivery_days: manualForm.delivery_days,
-        sorting_days: manualForm.sorting_days,
-        estimated_delivery: estimatedDelivery.toISOString()
+        tracking_number: trackingNumber, customer_name: manualForm.customer_name,
+        customer_email: manualForm.customer_email, shipping_address: manualForm.shipping_address,
+        city: manualForm.city, state: manualForm.state, zip_code: manualForm.zip_code,
+        country: manualForm.country, origin_country: manualForm.country_origin,
+        transit_country: manualForm.transit_country, destination_country: manualForm.country,
+        status: 'label_created', delivery_days: manualForm.delivery_days,
+        sorting_days: manualForm.sorting_days, estimated_delivery: estimatedDelivery.toISOString()
       };
 
       const response = await fetch(`${API_URL}/api/shipments`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(shipmentData)
       });
 
       if (response.ok) {
-        const data = await response.json();
         setGeneratedTracking({
-          tracking_number: trackingNumber,
-          customer_name: manualForm.customer_name,
-          country: manualForm.country,
-          estimated_delivery: estimatedDelivery
+          tracking_number: trackingNumber, customer_name: manualForm.customer_name,
+          country: manualForm.country, estimated_delivery: estimatedDelivery
         });
-        
-        // Reset form
         setManualForm({
-          customer_name: '',
-          customer_email: '',
-          shipping_address: '',
-          city: '',
-          state: '',
-          zip_code: '',
-          country: '',
-          delivery_days: 7,
-          country_origin: '',
-          transit_country: '',
-          sorting_days: 3,
-          post_delivery_event: 'Redelivery',
-          redelivery_days: 3,
-          attempts: 1
+          customer_name: '', customer_email: '', shipping_address: '', city: '', state: '', zip_code: '',
+          country: '', delivery_days: 7, country_origin: '', transit_country: '', sorting_days: 3,
+          post_delivery_event: 'Redelivery', redelivery_days: 3, attempts: 1
         });
-        
         fetchDashboardData();
       } else {
         const data = await response.json();
@@ -302,7 +275,6 @@ function App() {
     }
   };
 
-  // Handle store filter change
   const handleStoreFilterChange = (storeDomain) => {
     setSelectedStore(storeDomain);
     if (dashboardTab === 'pending') {
@@ -360,45 +332,24 @@ function App() {
               <div className="stat-card orange"><h3>PENDING ORDERS</h3><p className="stat-number">{filteredPendingOrders.length}</p></div>
             </div>
             
-            {/* Dashboard Tabs */}
             <div className="dashboard-tabs">
-              <button 
-                className={`tab-btn ${dashboardTab === 'recent' ? 'active' : ''}`}
-                onClick={() => setDashboardTab('recent')}
-              >
-                Recent Shipments
-              </button>
-              <button 
-                className={`tab-btn ${dashboardTab === 'pending' ? 'active' : ''}`}
-                onClick={() => { setDashboardTab('pending'); if (pendingOrders.length === 0) fetchPendingOrders(); }}
-              >
-                Pending Shipments
-              </button>
+              <button className={`tab-btn ${dashboardTab === 'recent' ? 'active' : ''}`} onClick={() => setDashboardTab('recent')}>Recent Shipments</button>
+              <button className={`tab-btn ${dashboardTab === 'pending' ? 'active' : ''}`} onClick={() => { setDashboardTab('pending'); if (pendingOrders.length === 0) fetchPendingOrders(); }}>Pending Shipments</button>
               
-              {/* Store Filter */}
               <div className="store-filter">
-                <select 
-                  value={selectedStore} 
-                  onChange={(e) => handleStoreFilterChange(e.target.value)}
-                >
+                <select value={selectedStore} onChange={(e) => handleStoreFilterChange(e.target.value)}>
                   <option value="all">All Stores</option>
-                  {stores.map(store => (
-                    <option key={store.id} value={store.domain}>{store.domain}</option>
-                  ))}
+                  {stores.map(store => (<option key={store.id} value={store.domain}>{store.domain}</option>))}
                 </select>
               </div>
               
-              <button 
-                className="fetch-btn"
-                onClick={() => fetchPendingOrders()}
-                disabled={pendingLoading}
-              >
+              <button className="refresh-btn" onClick={() => fetchPendingOrders()} disabled={pendingLoading}>🔄 Refresh</button>
+              <button className="fetch-btn" onClick={fetchAndFulfillOrders} disabled={pendingLoading}>
                 <span className="fetch-icon">⬇</span>
-                {pendingLoading ? 'Fetching...' : 'Fetch Pending Parcels'}
+                {pendingLoading ? 'Processing...' : 'Fetch Pending Parcels'}
               </button>
             </div>
 
-            {/* Recent Shipments Tab */}
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
                 <table>
@@ -412,31 +363,17 @@ function App() {
                         <td><button className="btn-small">View</button></td>
                       </tr>
                     ))}
-                    {filteredShipments.length === 0 && (
-                      <tr><td colSpan="6" className="no-data">No shipments yet</td></tr>
-                    )}
+                    {filteredShipments.length === 0 && (<tr><td colSpan="6" className="no-data">No shipments yet</td></tr>)}
                   </tbody>
                 </table>
               </div>
             )}
 
-            {/* Pending Shipments Tab */}
             {dashboardTab === 'pending' && (
               <div className="pending-shipments">
-                {pendingLoading ? (
-                  <div className="loading-state">Loading pending orders...</div>
-                ) : (
+                {pendingLoading ? (<div className="loading-state">Loading pending orders...</div>) : (
                   <table>
-                    <thead>
-                      <tr>
-                        <th>ORDER #</th>
-                        <th>CUSTOMER</th>
-                        <th>COUNTRY</th>
-                        <th>AMOUNT</th>
-                        <th>ORDER DATE</th>
-                        <th>FULFILLMENT</th>
-                      </tr>
-                    </thead>
+                    <thead><tr><th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>ORDER DATE</th><th>FULFILLMENT</th></tr></thead>
                     <tbody>
                       {filteredPendingOrders.map(order => (
                         <tr key={order.id}>
@@ -445,22 +382,14 @@ function App() {
                           <td>{order.country}</td>
                           <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
                           <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                          <td>
-                            <span className={`fulfillment-status ${order.fulfillment_status}`}>
-                              {order.fulfillment_status || 'unfulfilled'}
-                            </span>
-                          </td>
+                          <td><span className={`fulfillment-status ${order.fulfillment_status}`}>{order.fulfillment_status || 'unfulfilled'}</span></td>
                         </tr>
                       ))}
-                      {filteredPendingOrders.length === 0 && (
-                        <tr><td colSpan="6" className="no-data">No pending orders. Click "Fetch Pending Parcels" to load.</td></tr>
-                      )}
+                      {filteredPendingOrders.length === 0 && (<tr><td colSpan="6" className="no-data">No pending orders. Click "Refresh" to load.</td></tr>)}
                     </tbody>
                   </table>
                 )}
-                <div className="pending-info">
-                  <p>Pending Shipments (Page 1 of 1)</p>
-                </div>
+                <div className="pending-info"><p>Pending Shipments (Page 1 of 1)</p></div>
               </div>
             )}
           </div>
@@ -531,11 +460,10 @@ function App() {
         {currentPage === 'shipments' && (
           <div className="manual-entry">
             <h1>Manual Parcel Entry</h1>
-            
             <div className="manual-entry-container">
               <div className="manual-entry-info">
                 <p>This panel lets you manually register a parcel directly into the system.</p>
-                <p>A tracking number is automatically generated using the customer's country code and a unique 13-digit identifier, following the same logic used for automated Shopify imports.</p>
+                <p>A tracking number is automatically generated using the customer's country code and a unique 13-digit identifier.</p>
               </div>
 
               {generatedTracking && (
@@ -555,153 +483,40 @@ function App() {
                 <div className="form-section">
                   <h3 className="section-title">Customer Details</h3>
                   <div className="form-row">
-                    <div className="form-group">
-                      <label>Full Name</label>
-                      <input 
-                        type="text" 
-                        value={manualForm.customer_name} 
-                        onChange={(e) => setManualForm({...manualForm, customer_name: e.target.value})}
-                        required 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Email Address</label>
-                      <input 
-                        type="email" 
-                        value={manualForm.customer_email} 
-                        onChange={(e) => setManualForm({...manualForm, customer_email: e.target.value})}
-                      />
-                    </div>
+                    <div className="form-group"><label>Full Name</label><input type="text" value={manualForm.customer_name} onChange={(e) => setManualForm({...manualForm, customer_name: e.target.value})} required /></div>
+                    <div className="form-group"><label>Email Address</label><input type="email" value={manualForm.customer_email} onChange={(e) => setManualForm({...manualForm, customer_email: e.target.value})} /></div>
                   </div>
-                  <div className="form-group full-width">
-                    <label>Shipping Address</label>
-                    <textarea 
-                      value={manualForm.shipping_address} 
-                      onChange={(e) => setManualForm({...manualForm, shipping_address: e.target.value})}
-                      rows="2"
-                    />
-                  </div>
+                  <div className="form-group full-width"><label>Shipping Address</label><textarea value={manualForm.shipping_address} onChange={(e) => setManualForm({...manualForm, shipping_address: e.target.value})} rows="2" /></div>
                   <div className="form-row three-col">
-                    <div className="form-group">
-                      <label>City</label>
-                      <input 
-                        type="text" 
-                        value={manualForm.city} 
-                        onChange={(e) => setManualForm({...manualForm, city: e.target.value})}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>State / Region</label>
-                      <input 
-                        type="text" 
-                        value={manualForm.state} 
-                        onChange={(e) => setManualForm({...manualForm, state: e.target.value})}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>ZIP / Postal Code</label>
-                      <input 
-                        type="text" 
-                        value={manualForm.zip_code} 
-                        onChange={(e) => setManualForm({...manualForm, zip_code: e.target.value})}
-                      />
-                    </div>
+                    <div className="form-group"><label>City</label><input type="text" value={manualForm.city} onChange={(e) => setManualForm({...manualForm, city: e.target.value})} /></div>
+                    <div className="form-group"><label>State / Region</label><input type="text" value={manualForm.state} onChange={(e) => setManualForm({...manualForm, state: e.target.value})} /></div>
+                    <div className="form-group"><label>ZIP / Postal Code</label><input type="text" value={manualForm.zip_code} onChange={(e) => setManualForm({...manualForm, zip_code: e.target.value})} /></div>
                   </div>
                 </div>
 
                 <div className="form-section">
                   <h3 className="section-title">Delivery Info</h3>
                   <div className="form-row">
-                    <div className="form-group">
-                      <label>Destination Country <span className="hint">(Customer's country)</span></label>
-                      <select 
-                        value={manualForm.country} 
-                        onChange={(e) => setManualForm({...manualForm, country: e.target.value})}
-                        required
-                      >
-                        <option value="">Select Country...</option>
-                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Delivery Days <span className="hint">(Estimated transit time)</span></label>
-                      <input 
-                        type="number" 
-                        value={manualForm.delivery_days} 
-                        onChange={(e) => setManualForm({...manualForm, delivery_days: parseInt(e.target.value)})}
-                        min="1"
-                      />
-                    </div>
+                    <div className="form-group"><label>Destination Country <span className="hint">(Customer's country)</span></label><select value={manualForm.country} onChange={(e) => setManualForm({...manualForm, country: e.target.value})} required><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Delivery Days <span className="hint">(Estimated transit time)</span></label><input type="number" value={manualForm.delivery_days} onChange={(e) => setManualForm({...manualForm, delivery_days: parseInt(e.target.value)})} min="1" /></div>
                   </div>
                   <div className="form-row">
-                    <div className="form-group">
-                      <label>Country of Origin <span className="hint">(Where parcel ships from)</span></label>
-                      <select 
-                        value={manualForm.country_origin} 
-                        onChange={(e) => setManualForm({...manualForm, country_origin: e.target.value})}
-                      >
-                        <option value="">Select Country...</option>
-                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Transit Country <span className="hint">(Optional stopover country)</span></label>
-                      <select 
-                        value={manualForm.transit_country} 
-                        onChange={(e) => setManualForm({...manualForm, transit_country: e.target.value})}
-                      >
-                        <option value="">Select Country...</option>
-                        {countries.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
+                    <div className="form-group"><label>Country of Origin <span className="hint">(Where parcel ships from)</span></label><select value={manualForm.country_origin} onChange={(e) => setManualForm({...manualForm, country_origin: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Transit Country <span className="hint">(Optional stopover country)</span></label><select value={manualForm.transit_country} onChange={(e) => setManualForm({...manualForm, transit_country: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                   </div>
-                  <div className="form-group" style={{maxWidth: '250px'}}>
-                    <label>Sorting Days <span className="hint">(Days at sorting facility)</span></label>
-                    <input 
-                      type="number" 
-                      value={manualForm.sorting_days} 
-                      onChange={(e) => setManualForm({...manualForm, sorting_days: parseInt(e.target.value)})}
-                      min="0"
-                    />
-                  </div>
+                  <div className="form-group" style={{maxWidth: '250px'}}><label>Sorting Days <span className="hint">(Days at sorting facility)</span></label><input type="number" value={manualForm.sorting_days} onChange={(e) => setManualForm({...manualForm, sorting_days: parseInt(e.target.value)})} min="0" /></div>
                 </div>
 
                 <div className="form-section">
                   <h3 className="section-title">Post Delivery Settings</h3>
-                  <div className="form-group" style={{maxWidth: '250px'}}>
-                    <label>Post Delivery Event <span className="hint">(What happens after failed delivery)</span></label>
-                    <select 
-                      value={manualForm.post_delivery_event} 
-                      onChange={(e) => setManualForm({...manualForm, post_delivery_event: e.target.value})}
-                    >
-                      {postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </div>
+                  <div className="form-group" style={{maxWidth: '250px'}}><label>Post Delivery Event <span className="hint">(What happens after failed delivery)</span></label><select value={manualForm.post_delivery_event} onChange={(e) => setManualForm({...manualForm, post_delivery_event: e.target.value})}>{postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                   <div className="form-row">
-                    <div className="form-group">
-                      <label>Redelivery Days <span className="hint">(Days before redelivery attempt)</span></label>
-                      <input 
-                        type="number" 
-                        value={manualForm.redelivery_days} 
-                        onChange={(e) => setManualForm({...manualForm, redelivery_days: parseInt(e.target.value)})}
-                        min="0"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Attempts <span className="hint">(Max delivery attempts)</span></label>
-                      <input 
-                        type="number" 
-                        value={manualForm.attempts} 
-                        onChange={(e) => setManualForm({...manualForm, attempts: parseInt(e.target.value)})}
-                        min="1"
-                      />
-                    </div>
+                    <div className="form-group"><label>Redelivery Days <span className="hint">(Days before redelivery attempt)</span></label><input type="number" value={manualForm.redelivery_days} onChange={(e) => setManualForm({...manualForm, redelivery_days: parseInt(e.target.value)})} min="0" /></div>
+                    <div className="form-group"><label>Attempts <span className="hint">(Max delivery attempts)</span></label><input type="number" value={manualForm.attempts} onChange={(e) => setManualForm({...manualForm, attempts: parseInt(e.target.value)})} min="1" /></div>
                   </div>
                 </div>
 
-                <button type="submit" className="btn-generate" disabled={loading}>
-                  {loading ? 'Generating...' : 'Generate Tracking'}
-                </button>
+                <button type="submit" className="btn-generate" disabled={loading}>{loading ? 'Generating...' : 'Generate Tracking'}</button>
               </form>
             </div>
           </div>
@@ -711,10 +526,7 @@ function App() {
           <div className="missing">
             <h1>Missing Entries</h1>
             <p>Shipments that need attention will appear here.</p>
-            <div className="empty-state">
-              <span className="empty-icon">📭</span>
-              <p>No missing entries at this time.</p>
-            </div>
+            <div className="empty-state"><span className="empty-icon">📭</span><p>No missing entries at this time.</p></div>
           </div>
         )}
 
@@ -722,40 +534,14 @@ function App() {
           <div className="api-guide">
             <h1>How to Create a Shopify API Token</h1>
             <p>Follow these 7 steps to generate your Shopify Admin API token and connect your store to Trackisto.</p>
-            
-            <h3>Step 1: Open App Development</h3>
-            <p>Go to admin.shopify.com and login, then search for <strong>App development</strong> in your Shopify Admin settings, and click it.</p>
-            
-            <h3>Step 2: Click "Create an App"</h3>
-            <p>Once inside App Development, click the <strong>Create an app</strong> button.</p>
-            
-            <h3>Step 3: Name the App</h3>
-            <p>Give your app a name like "tracking" and proceed.</p>
-            
-            <h3>Step 4: Go to Admin API Configuration</h3>
-            <p>Click <strong>Configure Admin API scopes</strong> to begin selecting access permissions.</p>
-            
-            <h3>Step 5: Select Required API Scopes</h3>
-            <p>Enable all of the following Admin API scopes:</p>
-            <ul>
-              <li>read_orders</li>
-              <li>write_orders</li>
-              <li>read_fulfillments</li>
-              <li>write_fulfillments</li>
-              <li>read_products</li>
-              <li>read_locations</li>
-              <li>write_assigned_fulfillment_orders</li>
-              <li>read_assigned_fulfillment_orders</li>
-              <li>read_merchant_managed_fulfillment_orders</li>
-              <li>write_merchant_managed_fulfillment_orders</li>
-            </ul>
-            
-            <h3>Step 6: Install the App</h3>
-            <p>Click <strong>Install app</strong> to finalize and authorize your custom app.</p>
-            
-            <h3>Step 7: Copy the Admin API Token</h3>
-            <p>Reveal and copy your <strong>Admin API token</strong> (you can only view it once!). Paste this token into the Trackisto Shopify Settings page.</p>
-            
+            <h3>Step 1: Open App Development</h3><p>Go to admin.shopify.com and login, then search for <strong>App development</strong> in your Shopify Admin settings, and click it.</p>
+            <h3>Step 2: Click "Create an App"</h3><p>Once inside App Development, click the <strong>Create an app</strong> button.</p>
+            <h3>Step 3: Name the App</h3><p>Give your app a name like "tracking" and proceed.</p>
+            <h3>Step 4: Go to Admin API Configuration</h3><p>Click <strong>Configure Admin API scopes</strong> to begin selecting access permissions.</p>
+            <h3>Step 5: Select Required API Scopes</h3><p>Enable all of the following Admin API scopes:</p>
+            <ul><li>read_orders</li><li>write_orders</li><li>read_fulfillments</li><li>write_fulfillments</li><li>read_products</li><li>read_locations</li><li>write_assigned_fulfillment_orders</li><li>read_assigned_fulfillment_orders</li><li>read_merchant_managed_fulfillment_orders</li><li>write_merchant_managed_fulfillment_orders</li></ul>
+            <h3>Step 6: Install the App</h3><p>Click <strong>Install app</strong> to finalize and authorize your custom app.</p>
+            <h3>Step 7: Copy the Admin API Token</h3><p>Reveal and copy your <strong>Admin API token</strong> (you can only view it once!). Paste this token into the Trackisto Shopify Settings page.</p>
             <div className="warning-box">⚠️ This token is sensitive. Only reveal and use it securely inside your Trackisto admin panel.</div>
           </div>
         )}
