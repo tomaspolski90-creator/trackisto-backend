@@ -322,7 +322,7 @@
             updateProgress(data.status);
             const deliveryDate = new Date(data.delivery.estimatedDate);
             document.getElementById('displayDeliveryDate').textContent = deliveryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-            document.getElementById('displayDestination').textContent = data.customer.city + ', ' + data.customer.country;
+            document.getElementById('displayDestination').textContent = data.customer.address + ', ' + data.customer.zipCode + ' ' + data.customer.city + ', ' + data.customer.country;
             document.getElementById('displayRecipient').textContent = data.customer.name;
             const timelineContainer = document.getElementById('timelineContainer');
             timelineContainer.innerHTML = '';
