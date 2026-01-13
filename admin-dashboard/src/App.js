@@ -15,7 +15,7 @@ function App() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
   const [storeForm, setStoreForm] = useState({
-    domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
+    store_name: '', domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
     country_origin: 'United Kingdom', transit_country: '', post_delivery_event: 'None',
     sorting_days: 3, parcel_point: true, parcel_point_days: 3,
     redelivery_active: false, redelivery_days: 3, attempts: 1
@@ -24,9 +24,10 @@ function App() {
   
   const [dashboardTab, setDashboardTab] = useState('recent');
   const [pendingOrders, setPendingOrders] = useState([]);
-  const [fulfilledOrders, setFulfilledOrders] = useState([]); // NY STATE
+  const [fulfilledOrders, setFulfilledOrders] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [manualForm, setManualForm] = useState({
     customer_name: '', customer_email: '', shipping_address: '', city: '', state: '', zip_code: '',
@@ -79,7 +80,6 @@ function App() {
     setPendingLoading(false);
   };
 
-  // NY FUNKTION: Hent fulfilled orders
   const fetchFulfilledOrders = async (storeFilter = selectedStore) => {
     setPendingLoading(true);
     try {
@@ -127,17 +127,36 @@ function App() {
     ? pendingOrders 
     : pendingOrders.filter(order => order.store_domain === selectedStore);
 
-  // NY: Filter for fulfilled orders
-  const filteredFulfilledOrders = selectedStore === 'all' 
+  // Filter for fulfilled orders med søgning
+  const filteredFulfilledOrders = (selectedStore === 'all' 
     ? fulfilledOrders 
-    : fulfilledOrders.filter(order => order.store_domain === selectedStore);
+    : fulfilledOrders.filter(order => order.store_domain === selectedStore)
+  ).filter(order => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      order.tracking_number?.toLowerCase().includes(query) ||
+      order.customer_name?.toLowerCase().includes(query) ||
+      order.country?.toLowerCase().includes(query) ||
+      String(order.order_number).includes(query)
+    );
+  });
 
-  const filteredShipments = selectedStore === 'all'
+  const filteredShipments = (selectedStore === 'all'
     ? shipments
     : shipments.filter(s => {
         const store = stores.find(st => st.id === s.shopify_store_id);
         return store?.domain === selectedStore;
-      });
+      })
+  ).filter(s => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      s.tracking_number?.toLowerCase().includes(query) ||
+      s.customer_name?.toLowerCase().includes(query) ||
+      s.country?.toLowerCase().includes(query)
+    );
+  });
 
   useEffect(() => {
     if (token) { setIsLoggedIn(true); fetchDashboardData(); }
@@ -178,7 +197,7 @@ function App() {
 
   const resetStoreForm = () => {
     setStoreForm({
-      domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
+      store_name: '', domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
       country_origin: 'United Kingdom', transit_country: '', post_delivery_event: 'None',
       sorting_days: 3, parcel_point: true, parcel_point_days: 3,
       redelivery_active: false, redelivery_days: 3, attempts: 1
@@ -204,7 +223,7 @@ function App() {
 
   const handleEditStore = (store) => {
     setStoreForm({
-      domain: store.domain || '', api_token: store.api_token || '',
+      store_name: store.store_name || '', domain: store.domain || '', api_token: store.api_token || '',
       delivery_days: store.delivery_days || 7, send_offset: store.send_offset || 0,
       fulfillment_time: store.fulfillment_time || '10:00',
       country_origin: store.country_origin || 'United Kingdom',
@@ -366,7 +385,7 @@ function App() {
               <div className="store-filter">
                 <select value={selectedStore} onChange={(e) => handleStoreFilterChange(e.target.value)}>
                   <option value="all">All Stores</option>
-                  {stores.map(store => (<option key={store.id} value={store.domain}>{store.domain}</option>))}
+                  {stores.map(store => (<option key={store.id} value={store.domain}>{store.store_name ? `${store.store_name}` : store.domain}</option>))}
                 </select>
               </div>
               
@@ -379,6 +398,22 @@ function App() {
               )}
             </div>
 
+            {/* Søgefelt */}
+            {(dashboardTab === 'fulfilled' || dashboardTab === 'recent') && (
+              <div className="search-bar">
+                <input 
+                  type="text" 
+                  placeholder="Search by tracking number, customer, country..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+                {searchQuery && (
+                  <button className="search-clear" onClick={() => setSearchQuery('')}>✕</button>
+                )}
+              </div>
+            )}
+
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
                 <table>
@@ -389,10 +424,10 @@ function App() {
                         <td>{s.tracking_number}</td><td>{s.customer_name}</td><td>{s.country}</td>
                         <td><span className={`status ${s.status}`}>{s.status}</span></td>
                         <td>{new Date(s.created_at).toLocaleDateString()}</td>
-                        <td><button className="btn-small">View</button></td>
+                        <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
                       </tr>
                     ))}
-                    {filteredShipments.length === 0 && (<tr><td colSpan="6" className="no-data">No shipments yet</td></tr>)}
+                    {filteredShipments.length === 0 && (<tr><td colSpan="6" className="no-data">No shipments found</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -422,30 +457,27 @@ function App() {
               </div>
             )}
 
-            {/* NY TAB: Fulfilled Shipments */}
             {dashboardTab === 'fulfilled' && (
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading fulfilled orders...</div>) : (
                   <table>
-                    <thead><tr><th>ORDER #</th><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>ORDER DATE</th><th>FULFILLMENT</th><th>ACTIONS</th></tr></thead>
+                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
                     <tbody>
                       {filteredFulfilledOrders.map(order => (
                         <tr key={order.id}>
-                          <td>#{order.order_number}</td>
                           <td>{order.tracking_number || '-'}</td>
                           <td>{order.customer_name}</td>
                           <td>{order.country}</td>
-                          <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
+                          <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
                           <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                          <td><span className="fulfillment-status fulfilled">fulfilled</span></td>
-                          <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://grand-sorbet-268b5e.netlify.app/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
+                          <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
                         </tr>
                       ))}
-                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="8" className="no-data">No fulfilled orders found. Click "Refresh" to load.</td></tr>)}
+                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="6" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
                     </tbody>
                   </table>
                 )}
-                <div className="pending-info"><p>Fulfilled Shipments (Page 1 of 1)</p></div>
+                <div className="pending-info"><p>Fulfilled Shipments ({filteredFulfilledOrders.length} results)</p></div>
               </div>
             )}
           </div>
@@ -472,6 +504,7 @@ function App() {
                 <button className="btn-cancel" onClick={() => { setShowAddStore(false); resetStoreForm(); }}>✕ Cancel</button>
                 <form onSubmit={handleAddStore} className="store-form">
                   <div className="form-grid">
+                    <div className="form-group"><label>Store Name</label><input type="text" placeholder="My Store" value={storeForm.store_name} onChange={(e) => setStoreForm({ ...storeForm, store_name: e.target.value })} /><small className="field-hint">Display name for this store (shown in dropdown)</small></div>
                     <div className="form-group"><label>Shopify Domain</label><input type="text" placeholder="your-store.myshopify.com" value={storeForm.domain} onChange={(e) => setStoreForm({ ...storeForm, domain: e.target.value })} required /></div>
                     <div className="form-group"><label>Admin API Token</label><input type="text" placeholder="shpat_..." value={storeForm.api_token} onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })} required /></div>
                     <div className="form-group"><label>Delivery Days</label><input type="number" value={storeForm.delivery_days} onChange={(e) => setStoreForm({ ...storeForm, delivery_days: parseInt(e.target.value) })} min="1" required /></div>
@@ -496,13 +529,16 @@ function App() {
               <h2>Connected Stores</h2>
               {stores.length === 0 ? <p className="no-stores">No stores connected yet.</p> : (
                 <table>
-                  <thead><tr><th>Status</th><th>Domain</th><th>Days</th><th>Offset</th><th>Fulfill Time</th><th>Origin</th><th>Transit</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Status</th><th>Store Name</th><th>Domain</th><th>Days</th><th>Fulfill Time</th><th>Origin</th><th>Actions</th></tr></thead>
                   <tbody>
                     {stores.map(store => (
                       <tr key={store.id}>
                         <td><span className={`status-indicator ${store.status === 'active' ? 'active' : 'inactive'}`} onClick={() => toggleStoreStatus(store)}>{store.status === 'active' ? '✓' : '✕'}</span></td>
-                        <td>{store.domain}</td><td>{store.delivery_days}</td><td>{store.send_offset || 0}</td><td>{store.fulfillment_time || '10:00'}</td>
-                        <td>{store.country_origin}</td><td>{store.transit_country || '-'}</td>
+                        <td>{store.store_name || '-'}</td>
+                        <td>{store.domain}</td>
+                        <td>{store.delivery_days}</td>
+                        <td>{store.fulfillment_time || '10:00'}</td>
+                        <td>{store.country_origin}</td>
                         <td><button className="btn-edit" onClick={() => handleEditStore(store)}>Edit</button><button className="btn-delete" onClick={() => handleDeleteStore(store.id)}>Del</button></td>
                       </tr>
                     ))}
