@@ -11,8 +11,8 @@ const getPageFromHash = () => {
 };
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
   const [currentPage, setCurrentPage] = useState(getPageFromHash());
   const [shipments, setShipments] = useState([]);
   const [stores, setStores] = useState([]);
@@ -181,6 +181,15 @@ function App() {
   useEffect(() => {
     if (token) { setIsLoggedIn(true); fetchDashboardData(); }
   }, [token, fetchDashboardData]);
+
+  // Lyt efter hash changes (browser back/forward)
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentPage(getPageFromHash());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
