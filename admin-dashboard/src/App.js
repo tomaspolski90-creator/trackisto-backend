@@ -223,7 +223,7 @@ function App() {
 
   const handleEditStore = (store) => {
     setStoreForm({
-      store_name: store.store_name || '', domain: store.domain || '', api_token: store.api_token || '',
+      store_name: store.store_name || '', domain: store.domain || '', api_token: '',
       delivery_days: store.delivery_days || 7, send_offset: store.send_offset || 0,
       fulfillment_time: store.fulfillment_time || '10:00',
       country_origin: store.country_origin || 'United Kingdom',
@@ -388,6 +388,22 @@ function App() {
                   {stores.map(store => (<option key={store.id} value={store.domain}>{store.store_name ? `${store.store_name}` : store.domain}</option>))}
                 </select>
               </div>
+
+              {/* Søgefelt ved siden af dropdown */}
+              {(dashboardTab === 'fulfilled' || dashboardTab === 'recent') && (
+                <div className="search-bar-inline">
+                  <input 
+                    type="text" 
+                    placeholder="Search..." 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="search-input-inline"
+                  />
+                  {searchQuery && (
+                    <button className="search-clear-inline" onClick={() => setSearchQuery('')}>✕</button>
+                  )}
+                </div>
+              )}
               
               <button className="refresh-btn" onClick={() => { fetchPendingOrders(); fetchFulfilledOrders(); }} disabled={pendingLoading}>🔄 Refresh</button>
               {dashboardTab === 'pending' && (
@@ -397,22 +413,6 @@ function App() {
                 </button>
               )}
             </div>
-
-            {/* Søgefelt */}
-            {(dashboardTab === 'fulfilled' || dashboardTab === 'recent') && (
-              <div className="search-bar">
-                <input 
-                  type="text" 
-                  placeholder="Search by tracking number, customer, country..." 
-                  value={searchQuery} 
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="search-input"
-                />
-                {searchQuery && (
-                  <button className="search-clear" onClick={() => setSearchQuery('')}>✕</button>
-                )}
-              </div>
-            )}
 
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
@@ -506,7 +506,7 @@ function App() {
                   <div className="form-grid">
                     <div className="form-group"><label>Store Name</label><input type="text" placeholder="My Store" value={storeForm.store_name} onChange={(e) => setStoreForm({ ...storeForm, store_name: e.target.value })} /><small className="field-hint">Display name for this store (shown in dropdown)</small></div>
                     <div className="form-group"><label>Shopify Domain</label><input type="text" placeholder="your-store.myshopify.com" value={storeForm.domain} onChange={(e) => setStoreForm({ ...storeForm, domain: e.target.value })} required /></div>
-                    <div className="form-group"><label>Admin API Token</label><input type="text" placeholder="shpat_..." value={storeForm.api_token} onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })} required /></div>
+                    <div className="form-group"><label>Admin API Token</label><input type="text" placeholder={editingStore ? "(unchanged if empty)" : "shpat_..."} value={storeForm.api_token} onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })} required={!editingStore} />{editingStore && <small className="field-hint">Leave empty to keep existing token</small>}</div>
                     <div className="form-group"><label>Delivery Days</label><input type="number" value={storeForm.delivery_days} onChange={(e) => setStoreForm({ ...storeForm, delivery_days: parseInt(e.target.value) })} min="1" required /></div>
                     <div className="form-group"><label>Send Offset (Days)</label><input type="number" value={storeForm.send_offset} onChange={(e) => setStoreForm({ ...storeForm, send_offset: parseInt(e.target.value) })} min="0" /></div>
                     <div className="form-group"><label>Fulfillment Time</label><select value={storeForm.fulfillment_time} onChange={(e) => setStoreForm({ ...storeForm, fulfillment_time: e.target.value })}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select><small className="field-hint">Orders fulfilled at this time daily (Danish time)</small></div>
