@@ -22,6 +22,7 @@
         .header {
             background: #0d234b;
             padding: 16px 24px;
+            position: relative;
         }
 
         .header-content {
@@ -73,6 +74,20 @@
 
         .nav-links a:hover {
             color: #00a0d6;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .mobile-menu-btn svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
         }
 
         /* Hero */
@@ -289,21 +304,90 @@
         }
 
         @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+
             .nav-links {
                 display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: #0d234b;
+                flex-direction: column;
+                padding: 20px;
+                gap: 16px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                z-index: 100;
+            }
+
+            .nav-links.show {
+                display: flex;
+            }
+
+            .hero {
+                padding: 50px 20px;
             }
 
             .hero h1 {
                 font-size: 32px;
             }
 
-            .stats-grid, .values-grid {
+            /* Fjern ydre boks på mobil */
+            .container {
+                margin: 0;
+                padding: 0;
+            }
+
+            .content-card {
+                border-radius: 0;
+                box-shadow: none;
+                padding: 30px 20px;
+            }
+
+            .stats-grid {
                 grid-template-columns: 1fr;
+                gap: 16px;
+                margin: 30px 0;
+            }
+
+            .stat-card {
+                padding: 24px 20px;
+            }
+
+            .stat-number {
+                font-size: 36px;
+            }
+
+            .values-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .value-card {
+                padding: 24px 20px;
+            }
+
+            .highlight-box {
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 8px;
+            }
+
+            .content-card h2 {
+                font-size: 24px;
+                margin-top: 30px;
+            }
+
+            .footer {
+                margin-top: 40px;
+                padding: 40px 20px 24px;
             }
 
             .footer-content {
                 grid-template-columns: 1fr;
-                gap: 40px;
+                gap: 32px;
             }
         }
     </style>
@@ -318,12 +402,15 @@
                 </div>
                 RVS Logistics
             </a>
-            <nav class="nav-links">
+            <nav class="nav-links" id="navLinks">
                 <a href="index.html">Track & Trace</a>
                 <a href="about.html">About Us</a>
                 <a href="faq.html">FAQ</a>
                 <a href="contact.html">Contact</a>
             </nav>
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            </button>
         </div>
     </header>
 
@@ -464,6 +551,10 @@
         var email = user + '@' + domain;
         document.getElementById('aboutEmail').innerHTML = '<a href="mai' + 'lto:' + email + '" style="color: #00a0d6; font-weight: 600;">' + email + '</a>';
         document.getElementById('footerEmail').textContent = email;
+
+        function toggleMobileMenu() {
+            document.getElementById('navLinks').classList.toggle('show');
+        }
     </script>
 </body>
 </html>
