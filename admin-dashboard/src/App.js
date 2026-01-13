@@ -3,10 +3,17 @@ import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://trackisto-backend.onrender.com';
 
+// Hent page fra URL hash
+const getPageFromHash = () => {
+  const hash = window.location.hash.replace('#', '');
+  const validPages = ['dashboard', 'shipments', 'missing', 'shopify', 'api'];
+  return validPages.includes(hash) ? hash : 'dashboard';
+};
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(getPageFromHash());
   const [shipments, setShipments] = useState([]);
   const [stores, setStores] = useState([]);
   const [dashboardStats, setDashboardStats] = useState({ total: 0, today: 0, pending: 0 });
@@ -35,6 +42,12 @@ function App() {
     post_delivery_event: 'Redelivery', redelivery_days: 3, attempts: 1
   });
   const [generatedTracking, setGeneratedTracking] = useState(null);
+
+  // Opdater URL hash når page ændres
+  const navigateTo = (page) => {
+    setCurrentPage(page);
+    window.location.hash = page;
+  };
 
   const countries = [
     'Denmark', 'United Kingdom', 'Germany', 'Netherlands', 'France', 'Belgium', 'Italy', 'Spain',
@@ -185,7 +198,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token'); setToken(null); setIsLoggedIn(false); setCurrentPage('dashboard');
+    localStorage.removeItem('token'); setToken(null); setIsLoggedIn(false); navigateTo('dashboard');
   };
 
   const extractDomainFromUrl = (url) => {
@@ -363,13 +376,13 @@ function App() {
         <div className="logo"><h2>📦 Trackisto</h2></div>
         <div className="nav-title">Navigation</div>
         <ul className="nav-menu">
-          <li className={currentPage === 'dashboard' ? 'active' : ''} onClick={() => setCurrentPage('dashboard')}>📊 Dashboard</li>
-          <li className={currentPage === 'shipments' ? 'active' : ''} onClick={() => setCurrentPage('shipments')}>📦 Manual Entry</li>
-          <li className={currentPage === 'missing' ? 'active' : ''} onClick={() => setCurrentPage('missing')}>⏳ Missing Entries</li>
-          <li className={currentPage === 'shopify' ? 'active' : ''} onClick={() => setCurrentPage('shopify')}>🛒 Shopify Settings</li>
+          <li className={currentPage === 'dashboard' ? 'active' : ''} onClick={() => navigateTo('dashboard')}>📊 Dashboard</li>
+          <li className={currentPage === 'shipments' ? 'active' : ''} onClick={() => navigateTo('shipments')}>📦 Manual Entry</li>
+          <li className={currentPage === 'missing' ? 'active' : ''} onClick={() => navigateTo('missing')}>⏳ Missing Entries</li>
+          <li className={currentPage === 'shopify' ? 'active' : ''} onClick={() => navigateTo('shopify')}>🛒 Shopify Settings</li>
         </ul>
         <div className="nav-bottom">
-          <div className="nav-item" onClick={() => setCurrentPage('api')}>📖 API Guide</div>
+          <div className="nav-item" onClick={() => navigateTo('api')}>📖 API Guide</div>
           <div className="user-info">Logged in as <strong>admin</strong><button className="logout-btn" onClick={handleLogout}>Logout</button></div>
         </div>
       </nav>
