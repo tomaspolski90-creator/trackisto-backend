@@ -6,561 +6,127 @@
     <title>FAQ - RVS Logistics</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #ffffff;
-            color: #333;
-        }
-
-        /* Header */
-        .header {
-            background: #0d234b;
-            padding: 16px 24px;
-            position: relative;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logo {
-            font-size: 28px;
-            font-weight: 700;
-            color: #00a0d6;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: #00a0d6;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-icon svg {
-            width: 20px;
-            height: 20px;
-            fill: white;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 32px;
-        }
-
-        .nav-links a {
-            color: #ffffff;
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-            transition: color 0.2s;
-        }
-
-        .nav-links a:hover {
-            color: #00a0d6;
-        }
-
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-        }
-
-        .mobile-menu-btn svg {
-            width: 28px;
-            height: 28px;
-            fill: white;
-        }
-
-        /* Hero */
-        .hero {
-            background: linear-gradient(135deg, #00a0d6 0%, #0d234b 100%);
-            color: white;
-            padding: 80px 24px;
-            text-align: center;
-        }
-
-        .hero h1 {
-            font-size: 48px;
-            font-weight: 700;
-            margin-bottom: 16px;
-        }
-
-        .hero p {
-            font-size: 18px;
-            opacity: 0.9;
-        }
-
-        /* Content */
-        .container {
-            max-width: 900px;
-            margin: -40px auto 60px;
-            padding: 0 24px;
-            position: relative;
-            z-index: 10;
-        }
-
-        .content-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            padding: 50px;
-        }
-
-        .category-title {
-            font-size: 24px;
-            color: #0d234b;
-            margin: 40px 0 24px;
-            padding-bottom: 12px;
-            border-bottom: 3px solid #00a0d6;
-        }
-
-        .category-title:first-child {
-            margin-top: 0;
-        }
-
-        .faq-item {
-            margin-bottom: 16px;
-            border: 2px solid #f0f0f0;
-            border-radius: 12px;
-            overflow: hidden;
-            transition: border-color 0.3s;
-        }
-
-        .faq-item:hover {
-            border-color: #00a0d6;
-        }
-
-        .faq-question {
-            padding: 20px 24px;
-            background: #f8f9fa;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            font-size: 16px;
-            color: #0d234b;
-            transition: background 0.3s;
-        }
-
-        .faq-question:hover {
-            background: #f0f8fc;
-        }
-
-        .faq-question::after {
-            content: '+';
-            font-size: 24px;
-            font-weight: 700;
-            color: #00a0d6;
-            transition: transform 0.3s;
-        }
-
-        .faq-question.active::after {
-            content: '−';
-        }
-
-        .faq-answer {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-            background: white;
-        }
-
-        .faq-answer.show {
-            max-height: 500px;
-        }
-
-        .faq-answer-content {
-            padding: 24px;
-            color: #555;
-            line-height: 1.8;
-            font-size: 15px;
-        }
-
-        .contact-section {
-            background: #f0f8fc;
-            border-radius: 12px;
-            padding: 30px;
-            margin-top: 40px;
-            text-align: center;
-        }
-
-        .contact-section h3 {
-            color: #0d234b;
-            margin-bottom: 12px;
-            font-size: 22px;
-        }
-
-        .contact-section p {
-            color: #555;
-            margin-bottom: 20px;
-        }
-
-        .contact-btn {
-            display: inline-block;
-            padding: 14px 32px;
-            background: #00a0d6;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: background 0.3s;
-        }
-
-        .contact-btn:hover {
-            background: #0088b8;
-        }
-
-        /* Footer */
-        .footer {
-            background: #0d234b;
-            color: white;
-            padding: 60px 24px 30px;
-            margin-top: 80px;
-        }
-
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 60px;
-        }
-
-        .footer h4 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #00a0d6;
-        }
-
-        .footer p {
-            color: rgba(255,255,255,0.8);
-            font-size: 15px;
-            line-height: 1.8;
-        }
-
-        .footer a {
-            color: rgba(255,255,255,0.8);
-            text-decoration: none;
-            font-size: 15px;
-            display: block;
-            margin-bottom: 12px;
-            transition: color 0.2s;
-        }
-
-        .footer a:hover {
-            color: #00a0d6;
-        }
-
-        .footer-bottom {
-            max-width: 1200px;
-            margin: 40px auto 0;
-            padding-top: 24px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-            font-size: 14px;
-            color: rgba(255,255,255,0.6);
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #333; }
+        .header { background: #0d234b; padding: 12px 24px; position: relative; }
+        .header-content { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .nav-left, .nav-right { display: flex; gap: 32px; flex: 1; }
+        .nav-left { justify-content: flex-start; }
+        .nav-right { justify-content: flex-end; }
+        .nav-left a, .nav-right a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; transition: color 0.2s; }
+        .nav-left a:hover, .nav-right a:hover { color: #29ABE2; }
+        .logo { display: flex; align-items: center; justify-content: center; padding: 0 40px; }
+        .logo img { height: 50px; width: auto; }
+        .mobile-menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
+        .mobile-menu-btn svg { width: 28px; height: 28px; fill: white; }
+        .mobile-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0d234b; flex-direction: column; padding: 20px; gap: 16px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; }
+        .mobile-nav.show { display: flex; }
+        .mobile-nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; padding: 8px 0; }
+        .hero { background: linear-gradient(135deg, #29ABE2 0%, #0d234b 100%); color: white; padding: 80px 24px; text-align: center; }
+        .hero h1 { font-size: 48px; font-weight: 700; margin-bottom: 16px; }
+        .hero p { font-size: 18px; opacity: 0.9; }
+        .container { max-width: 900px; margin: -40px auto 60px; padding: 0 24px; position: relative; z-index: 10; }
+        .content-card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 50px; }
+        .category-title { font-size: 24px; color: #0d234b; margin: 40px 0 24px; padding-bottom: 12px; border-bottom: 3px solid #29ABE2; }
+        .category-title:first-child { margin-top: 0; }
+        .faq-item { margin-bottom: 16px; border: 2px solid #f0f0f0; border-radius: 12px; overflow: hidden; transition: border-color 0.3s; }
+        .faq-item:hover { border-color: #29ABE2; }
+        .faq-question { padding: 20px 24px; background: #f8f9fa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 16px; color: #0d234b; transition: background 0.3s; }
+        .faq-question:hover { background: #f0f8fc; }
+        .faq-question::after { content: '+'; font-size: 24px; font-weight: 700; color: #29ABE2; }
+        .faq-question.active::after { content: '−'; }
+        .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; background: white; }
+        .faq-answer.show { max-height: 500px; }
+        .faq-answer-content { padding: 24px; color: #555; line-height: 1.8; font-size: 15px; }
+        .contact-section { background: #f0f8fc; border-radius: 12px; padding: 30px; margin-top: 40px; text-align: center; }
+        .contact-section h3 { color: #0d234b; margin-bottom: 12px; font-size: 22px; }
+        .contact-section p { color: #555; margin-bottom: 20px; }
+        .contact-btn { display: inline-block; padding: 14px 32px; background: #29ABE2; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: background 0.3s; }
+        .contact-btn:hover { background: #1a8bc2; }
+        .footer { background: #0d234b; color: white; padding: 60px 24px 30px; margin-top: 80px; }
+        .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 60px; }
+        .footer h4 { font-size: 18px; margin-bottom: 20px; color: #29ABE2; }
+        .footer p { color: rgba(255,255,255,0.8); font-size: 15px; line-height: 1.8; }
+        .footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 15px; display: block; margin-bottom: 12px; transition: color 0.2s; }
+        .footer a:hover { color: #29ABE2; }
+        .footer-bottom { max-width: 1200px; margin: 40px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; font-size: 14px; color: rgba(255,255,255,0.6); }
         @media (max-width: 768px) {
-            .mobile-menu-btn {
-                display: block;
-            }
-
-            .nav-links {
-                display: none;
-                position: absolute;
-                top: 100%;
-                left: 0;
-                right: 0;
-                background: #0d234b;
-                flex-direction: column;
-                padding: 20px;
-                gap: 16px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-                z-index: 100;
-            }
-
-            .nav-links.show {
-                display: flex;
-            }
-
-            .hero {
-                padding: 50px 20px;
-            }
-
-            .hero h1 {
-                font-size: 32px;
-            }
-
-            /* Fjern ydre boks på mobil */
-            .container {
-                margin: 0;
-                padding: 0;
-            }
-
-            .content-card {
-                border-radius: 0;
-                box-shadow: none;
-                padding: 30px 20px;
-            }
-
-            .category-title {
-                font-size: 20px;
-                margin: 30px 0 20px;
-            }
-
-            .faq-question {
-                padding: 16px 20px;
-                font-size: 15px;
-            }
-
-            .faq-answer-content {
-                padding: 20px;
-            }
-
-            .contact-section {
-                padding: 24px 20px;
-                margin-top: 30px;
-                border-radius: 8px;
-            }
-
-            .contact-section h3 {
-                font-size: 20px;
-            }
-
-            .footer {
-                margin-top: 40px;
-                padding: 40px 20px 24px;
-            }
-
-            .footer-content {
-                grid-template-columns: 1fr;
-                gap: 32px;
-            }
+            .mobile-menu-btn { display: block; }
+            .nav-left, .nav-right { display: none; }
+            .header-content { justify-content: space-between; }
+            .logo { padding: 0; flex: 1; justify-content: flex-start; }
+            .hero { padding: 50px 20px; }
+            .hero h1 { font-size: 32px; }
+            .container { margin: 0; padding: 0; }
+            .content-card { border-radius: 0; box-shadow: none; padding: 30px 20px; }
+            .category-title { font-size: 20px; margin: 30px 0 20px; }
+            .faq-question { padding: 16px 20px; font-size: 15px; }
+            .faq-answer-content { padding: 20px; }
+            .contact-section { padding: 24px 20px; margin-top: 30px; border-radius: 8px; }
+            .contact-section h3 { font-size: 20px; }
+            .footer { margin-top: 40px; padding: 40px 20px 24px; }
+            .footer-content { grid-template-columns: 1fr; gap: 32px; }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <a href="index.html" class="logo">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-                </div>
-                RVS Logistics
-            </a>
-            <nav class="nav-links" id="navLinks">
-                <a href="index.html">Track & Trace</a>
-                <a href="about.html">About Us</a>
-                <a href="faq.html">FAQ</a>
-                <a href="contact.html">Contact</a>
-            </nav>
-            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
-                <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
-            </button>
+            <nav class="nav-left"><a href="index.html">Track & Trace</a><a href="faq.html">FAQ</a></nav>
+            <a href="index.html" class="logo"><img src="rvs-logo.png" alt="RVS Logistics"></a>
+            <nav class="nav-right"><a href="about.html">About Us</a><a href="contact.html">Contact</a></nav>
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
         </div>
+        <nav class="mobile-nav" id="mobileNav"><a href="index.html">Track & Trace</a><a href="faq.html">FAQ</a><a href="about.html">About Us</a><a href="contact.html">Contact</a></nav>
     </header>
 
-    <!-- Hero -->
-    <section class="hero">
-        <h1>Frequently Asked Questions</h1>
-        <p>Find answers to common questions about tracking your parcels</p>
-    </section>
+    <section class="hero"><h1>Frequently Asked Questions</h1><p>Find answers to common questions about tracking your parcels</p></section>
 
-    <!-- Content -->
     <div class="container">
         <div class="content-card">
             <h2 class="category-title">Tracking</h2>
-
-            <div class="faq-item">
-                <div class="faq-question">How do I track my parcel?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Simply enter your tracking number in the search box on our homepage and click "Track". 
-                        You'll see real-time updates on your parcel's location and estimated delivery date.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">Where do I find my tracking number?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Your tracking number is provided by the sender in your shipping confirmation email. 
-                        It's usually a combination of letters and numbers (e.g., GB2235047529408).
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">My tracking number isn't working. What should I do?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Please double-check that you've entered the tracking number correctly with no spaces. 
-                        If it still doesn't work, the tracking information may not be available yet. Wait 24 hours 
-                        and try again. If the problem persists, contact our support team.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">How often is tracking information updated?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Tracking information is updated in real-time as your parcel moves through our network. 
-                        However, there may be delays of a few hours between scans at different facilities.
-                    </div>
-                </div>
-            </div>
+            <div class="faq-item"><div class="faq-question">How do I track my parcel?</div><div class="faq-answer"><div class="faq-answer-content">Simply enter your tracking number in the search box on our homepage and click "Track". You'll see real-time updates on your parcel's location and estimated delivery date.</div></div></div>
+            <div class="faq-item"><div class="faq-question">Where do I find my tracking number?</div><div class="faq-answer"><div class="faq-answer-content">Your tracking number is provided by the sender in your shipping confirmation email. It's usually a combination of letters and numbers (e.g., DK1768209661360).</div></div></div>
+            <div class="faq-item"><div class="faq-question">My tracking number isn't working. What should I do?</div><div class="faq-answer"><div class="faq-answer-content">Please double-check that you've entered the tracking number correctly with no spaces. If it still doesn't work, the tracking information may not be available yet. Wait 24 hours and try again. If the problem persists, contact our support team.</div></div></div>
+            <div class="faq-item"><div class="faq-question">How often is tracking information updated?</div><div class="faq-answer"><div class="faq-answer-content">Tracking information is updated in real-time as your parcel moves through our network. However, there may be delays of a few hours between scans at different facilities.</div></div></div>
 
             <h2 class="category-title">Delivery</h2>
-
-            <div class="faq-item">
-                <div class="faq-question">When will my parcel be delivered?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        The estimated delivery date is shown on your tracking page. This is calculated based on 
-                        the shipping method and destination. Keep in mind that unforeseen circumstances may cause delays.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">What if I'm not home when my parcel arrives?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        If you're not home, the driver will leave a delivery notice with instructions on how to 
-                        reschedule delivery or pick up your parcel from a nearby collection point.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">Can I change my delivery address?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Address changes depend on the shipping carrier and where your parcel is in transit. 
-                        Contact our support team as soon as possible, and we'll do our best to help.
-                    </div>
-                </div>
-            </div>
+            <div class="faq-item"><div class="faq-question">When will my parcel be delivered?</div><div class="faq-answer"><div class="faq-answer-content">The estimated delivery date is shown on your tracking page. This is calculated based on the shipping method and destination. Keep in mind that unforeseen circumstances may cause delays.</div></div></div>
+            <div class="faq-item"><div class="faq-question">What if I'm not home when my parcel arrives?</div><div class="faq-answer"><div class="faq-answer-content">If you're not home, the driver will leave a delivery notice with instructions on how to reschedule delivery or pick up your parcel from a nearby collection point.</div></div></div>
+            <div class="faq-item"><div class="faq-question">Can I change my delivery address?</div><div class="faq-answer"><div class="faq-answer-content">Address changes depend on the shipping carrier and where your parcel is in transit. Contact our support team as soon as possible, and we'll do our best to help.</div></div></div>
 
             <h2 class="category-title">Problems</h2>
+            <div class="faq-item"><div class="faq-question">My parcel is delayed. What should I do?</div><div class="faq-answer"><div class="faq-answer-content">Delays can occur due to weather, customs processing, or high shipping volumes. Check your tracking page for the latest updates. If your parcel is significantly delayed, contact our support team for assistance.</div></div></div>
+            <div class="faq-item"><div class="faq-question">My parcel shows as delivered, but I haven't received it</div><div class="faq-answer"><div class="faq-answer-content">First, check with neighbors or household members. Sometimes parcels are left in a safe place. If you still can't find it, contact our support team immediately with your tracking number.</div></div></div>
+            <div class="faq-item"><div class="faq-question">How do I report a problem with my delivery?</div><div class="faq-answer"><div class="faq-answer-content">Contact our customer support team via email at <span id="faqEmail"></span> with your tracking number and a description of the problem. We'll investigate and get back to you within 24 hours.</div></div></div>
 
-            <div class="faq-item">
-                <div class="faq-question">My parcel is delayed. What should I do?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Delays can occur due to weather, customs processing, or high shipping volumes. Check your 
-                        tracking page for the latest updates. If your parcel is significantly delayed, contact our 
-                        support team for assistance.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">My parcel shows as delivered, but I haven't received it</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        First, check with neighbors or household members. Sometimes parcels are left in a safe place. 
-                        If you still can't find it, contact our support team immediately with your tracking number.
-                    </div>
-                </div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-question">How do I report a problem with my delivery?</div>
-                <div class="faq-answer">
-                    <div class="faq-answer-content">
-                        Contact our customer support team via email at <span id="faqEmail"></span> with your tracking number 
-                        and a description of the problem. We'll investigate and get back to you within 24 hours.
-                    </div>
-                </div>
-            </div>
-
-            <div class="contact-section">
-                <h3>Still have questions?</h3>
-                <p>Can't find the answer you're looking for? Our support team is here to help!</p>
-                <a href="contact.html" class="contact-btn">Contact Support</a>
-            </div>
+            <div class="contact-section"><h3>Still have questions?</h3><p>Can't find the answer you're looking for? Our support team is here to help!</p><a href="contact.html" class="contact-btn">Contact Support</a></div>
         </div>
     </div>
 
-    <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
-            <div>
-                <h4>RVS Logistics</h4>
-                <p>Professional parcel tracking solutions for businesses and individuals. Real-time updates, reliable service, delivered with excellence.</p>
-            </div>
-            <div>
-                <h4>Quick Links</h4>
-                <a href="index.html">Track & Trace</a>
-                <a href="about.html">About Us</a>
-                <a href="faq.html">FAQ</a>
-                <a href="contact.html">Contact Us</a>
-            </div>
-            <div>
-                <h4>Contact</h4>
-                <p id="footerEmail"></p>
-                <p>Mon-Fri: 8:00-17:00</p>
-            </div>
+            <div><h4>RVS Logistics</h4><p>Professional parcel tracking solutions for businesses and individuals. Real-time updates, reliable service, delivered with excellence.</p></div>
+            <div><h4>Quick Links</h4><a href="index.html">Track & Trace</a><a href="about.html">About Us</a><a href="faq.html">FAQ</a><a href="contact.html">Contact Us</a></div>
+            <div><h4>Contact</h4><p id="footerEmail"></p><p>Mon-Fri: 8:00-17:00</p></div>
         </div>
-        <div class="footer-bottom">
-            © 2025 RVS Logistics. All rights reserved.
-        </div>
+        <div class="footer-bottom">© 2025 RVS Logistics. All rights reserved.</div>
     </footer>
 
     <script>
-        var user = 'support';
-        var domain = 'rvslogistics.com';
-        var email = user + '@' + domain;
+        var user = 'support'; var domain = 'rvslogistics.com'; var email = user + '@' + domain;
         document.getElementById('faqEmail').textContent = email;
         document.getElementById('footerEmail').textContent = email;
-
         document.querySelectorAll('.faq-question').forEach(question => {
             question.addEventListener('click', () => {
                 const answer = question.nextElementSibling;
                 const isOpen = answer.classList.contains('show');
-                
-                document.querySelectorAll('.faq-answer').forEach(a => {
-                    a.classList.remove('show');
-                });
-                document.querySelectorAll('.faq-question').forEach(q => {
-                    q.classList.remove('active');
-                });
-                
-                if (!isOpen) {
-                    answer.classList.add('show');
-                    question.classList.add('active');
-                }
+                document.querySelectorAll('.faq-answer').forEach(a => a.classList.remove('show'));
+                document.querySelectorAll('.faq-question').forEach(q => q.classList.remove('active'));
+                if (!isOpen) { answer.classList.add('show'); question.classList.add('active'); }
             });
         });
-
-        function toggleMobileMenu() {
-            document.getElementById('navLinks').classList.toggle('show');
-        }
+        function toggleMobileMenu() { document.getElementById('mobileNav').classList.toggle('show'); }
     </script>
 </body>
 </html>

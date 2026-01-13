@@ -9,18 +9,22 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #333; }
 
-        .header { background: #0d234b; padding: 16px 24px; position: relative; }
+        .header { background: #0d234b; padding: 12px 24px; position: relative; }
         .header-content { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
-        .logo { font-size: 28px; font-weight: 700; color: #00a0d6; text-decoration: none; display: flex; align-items: center; gap: 10px; }
-        .logo-icon { width: 32px; height: 32px; background: #00a0d6; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-        .logo-icon svg { width: 20px; height: 20px; fill: white; }
-        .nav-links { display: flex; gap: 32px; }
-        .nav-links a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; transition: color 0.2s; }
-        .nav-links a:hover { color: #00a0d6; }
+        .nav-left, .nav-right { display: flex; gap: 32px; flex: 1; }
+        .nav-left { justify-content: flex-start; }
+        .nav-right { justify-content: flex-end; }
+        .nav-left a, .nav-right a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; transition: color 0.2s; }
+        .nav-left a:hover, .nav-right a:hover { color: #29ABE2; }
+        .logo { display: flex; align-items: center; justify-content: center; padding: 0 40px; }
+        .logo img { height: 50px; width: auto; }
         .mobile-menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
         .mobile-menu-btn svg { width: 28px; height: 28px; fill: white; }
+        .mobile-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0d234b; flex-direction: column; padding: 20px; gap: 16px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; }
+        .mobile-nav.show { display: flex; }
+        .mobile-nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; padding: 8px 0; }
 
-        .hero { background: linear-gradient(135deg, #00a0d6 0%, #0d234b 100%); color: white; padding: 80px 24px; text-align: center; position: relative; overflow: hidden; }
+        .hero { background: linear-gradient(135deg, #29ABE2 0%, #0d234b 100%); color: white; padding: 80px 24px; text-align: center; position: relative; overflow: hidden; }
         .hero::before { content: ''; position: absolute; top: 0; right: 0; width: 50%; height: 100%; background: #0d234b; border-radius: 0 0 0 50%; opacity: 0.3; }
         .hero-content { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; }
         .hero h1 { font-size: 48px; font-weight: 700; margin-bottom: 30px; }
@@ -56,7 +60,7 @@
         .results { display: none; padding: 60px 24px; }
         .results.show { display: block; }
         .results-card { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 40px; }
-        .back-link { display: inline-flex; align-items: center; gap: 8px; color: #00a0d6; text-decoration: none; font-weight: 500; margin-bottom: 24px; font-size: 15px; }
+        .back-link { display: inline-flex; align-items: center; gap: 8px; color: #29ABE2; text-decoration: none; font-weight: 500; margin-bottom: 24px; font-size: 15px; }
         .back-link:hover { text-decoration: underline; }
         .tracking-header { border-bottom: 2px solid #f0f0f0; padding-bottom: 24px; margin-bottom: 32px; }
         .tracking-number-display { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
@@ -80,18 +84,18 @@
         .progress-title { font-size: 14px; color: #666; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
         .progress-track { display: flex; align-items: flex-start; justify-content: space-between; position: relative; padding: 0 10px; }
         .progress-track::before { content: ''; position: absolute; top: 24px; left: 34px; right: 34px; height: 3px; background: #e0e0e0; z-index: 0; }
-        .progress-fill { position: absolute; top: 24px; left: 34px; height: 3px; background: #00a0d6; z-index: 1; transition: width 1s ease; }
+        .progress-fill { position: absolute; top: 24px; left: 34px; height: 3px; background: #29ABE2; z-index: 1; transition: width 1s ease; }
         .progress-step { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; flex: 0 0 auto; }
         .progress-dot { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 50%; background: white; border: 3px solid #e0e0e0; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; transition: all 0.3s; box-sizing: border-box; }
         .progress-dot svg { width: 22px; height: 22px; fill: #999; flex-shrink: 0; }
-        .progress-dot.active { border-color: #00a0d6; background: #00a0d6; }
+        .progress-dot.active { border-color: #29ABE2; background: #29ABE2; }
         .progress-dot.active svg { fill: white; }
         .progress-dot.completed { border-color: #28a745; background: #28a745; }
         .progress-dot.completed svg { fill: white; }
         .progress-label { font-size: 13px; color: #666; text-align: center; max-width: 90px; }
 
         .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 40px 0; }
-        .info-item { padding: 24px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #00a0d6; }
+        .info-item { padding: 24px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #29ABE2; }
         .info-label { font-size: 13px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
         .info-value { font-size: 18px; color: #0d234b; font-weight: 600; }
 
@@ -101,8 +105,8 @@
         .timeline::before { content: ''; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: #e0e0e0; }
         .timeline-item { position: relative; padding-bottom: 32px; }
         .timeline-item:last-child { padding-bottom: 0; }
-        .timeline-dot { position: absolute; left: -50px; top: 8px; width: 28px; height: 28px; border-radius: 50%; background: #e8f4f8; border: 2px solid #00a0d6; display: flex; align-items: center; justify-content: center; }
-        .timeline-dot svg { width: 14px; height: 14px; fill: #00a0d6; }
+        .timeline-dot { position: absolute; left: -50px; top: 8px; width: 28px; height: 28px; border-radius: 50%; background: #e8f4f8; border: 2px solid #29ABE2; display: flex; align-items: center; justify-content: center; }
+        .timeline-dot svg { width: 14px; height: 14px; fill: #29ABE2; }
         .timeline-content { background: #f8f9fa; padding: 16px 20px; border-radius: 8px; }
         .timeline-status { font-size: 16px; font-weight: 600; color: #0d234b; margin-bottom: 4px; }
         .timeline-location { font-size: 14px; color: #666; margin-bottom: 4px; }
@@ -111,23 +115,24 @@
         .btn { padding: 14px 28px; border: 2px solid #0d234b; background: white; color: #0d234b; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
         .btn svg { width: 16px; height: 16px; fill: currentColor; }
         .btn:hover { background: #0d234b; color: white; }
-        .btn.primary { background: #00a0d6; border-color: #00a0d6; color: white; }
-        .btn.primary:hover { background: #0088b8; border-color: #0088b8; }
+        .btn.primary { background: #29ABE2; border-color: #29ABE2; color: white; }
+        .btn.primary:hover { background: #1a8bc2; border-color: #1a8bc2; }
 
         .error { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; padding: 16px 20px; border-radius: 8px; margin-top: 20px; }
 
         .footer { background: #0d234b; color: white; padding: 60px 24px 30px; margin-top: 80px; }
         .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 60px; }
-        .footer h4 { font-size: 18px; margin-bottom: 20px; color: #00a0d6; }
+        .footer h4 { font-size: 18px; margin-bottom: 20px; color: #29ABE2; }
         .footer p { color: rgba(255,255,255,0.8); font-size: 15px; line-height: 1.8; }
         .footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 15px; display: block; margin-bottom: 12px; transition: color 0.2s; }
-        .footer a:hover { color: #00a0d6; }
+        .footer a:hover { color: #29ABE2; }
         .footer-bottom { max-width: 1200px; margin: 40px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; font-size: 14px; color: rgba(255,255,255,0.6); }
 
         @media (max-width: 768px) {
             .mobile-menu-btn { display: block; }
-            .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0d234b; flex-direction: column; padding: 20px; gap: 16px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; }
-            .nav-links.show { display: flex; }
+            .nav-left, .nav-right { display: none; }
+            .header-content { justify-content: space-between; }
+            .logo { padding: 0; flex: 1; justify-content: flex-start; }
             .hero { padding: 50px 20px; }
             .hero h1 { font-size: 32px; }
             .search-container { flex-direction: column; }
@@ -157,22 +162,27 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <a href="index.html" class="logo">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-                </div>
-                RVS Logistics
-            </a>
-            <nav class="nav-links" id="navLinks">
+            <nav class="nav-left">
                 <a href="index.html">Track & Trace</a>
-                <a href="about.html">About Us</a>
                 <a href="faq.html">FAQ</a>
+            </nav>
+            <a href="index.html" class="logo">
+                <img src="rvs-logo.png" alt="RVS Logistics">
+            </a>
+            <nav class="nav-right">
+                <a href="about.html">About Us</a>
                 <a href="contact.html">Contact</a>
             </nav>
             <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
                 <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
             </button>
         </div>
+        <nav class="mobile-nav" id="mobileNav">
+            <a href="index.html">Track & Trace</a>
+            <a href="faq.html">FAQ</a>
+            <a href="about.html">About Us</a>
+            <a href="contact.html">Contact</a>
+        </nav>
     </header>
 
     <section class="hero" id="heroSection">
@@ -303,7 +313,6 @@
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || 'Tracking number not found');
                 currentTrackingNumber = trackingNumber;
-                // Opdater URL med tracking nummer
                 window.history.pushState({tracking: trackingNumber}, '', '?tracking=' + trackingNumber);
                 displayResults(data);
             } catch (error) { errorMessage.innerHTML = '<div class="error">' + error.message + '</div>'; }
@@ -397,7 +406,7 @@
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        function toggleMobileMenu() { document.getElementById('navLinks').classList.toggle('show'); }
+        function toggleMobileMenu() { document.getElementById('mobileNav').classList.toggle('show'); }
     </script>
 </body>
 </html>
