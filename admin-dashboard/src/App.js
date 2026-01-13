@@ -83,12 +83,23 @@ function App() {
   const fetchFulfilledOrders = async (storeFilter = selectedStore) => {
     setPendingLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/shopify/fulfilled-orders${storeFilter !== 'all' ? `?store=${storeFilter}` : ''}`, {
+      // Hent fra shipments tabellen (vores database) i stedet for Shopify API
+      const response = await fetch(`${API_URL}/api/shipments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
-        setFulfilledOrders(data.orders || []);
+        let orders = data.shipments || [];
+        
+        // Filtrer på store hvis valgt
+        if (storeFilter !== 'all') {
+          const store = stores.find(s => s.domain === storeFilter);
+          if (store) {
+            orders = orders.filter(o => o.shopify_store_id === store.id);
+          }
+        }
+        
+        setFulfilledOrders(orders);
       }
     } catch (error) {
       console.error('Error fetching fulfilled orders:', error);
@@ -127,18 +138,14 @@ function App() {
     ? pendingOrders 
     : pendingOrders.filter(order => order.store_domain === selectedStore);
 
-  // Filter for fulfilled orders med søgning
-  const filteredFulfilledOrders = (selectedStore === 'all' 
-    ? fulfilledOrders 
-    : fulfilledOrders.filter(order => order.store_domain === selectedStore)
-  ).filter(order => {
+  // Filter for fulfilled orders med søgning (nu fra shipments tabellen)
+  const filteredFulfilledOrders = fulfilledOrders.filter(order => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
       order.tracking_number?.toLowerCase().includes(query) ||
       order.customer_name?.toLowerCase().includes(query) ||
-      order.country?.toLowerCase().includes(query) ||
-      String(order.order_number).includes(query)
+      order.country?.toLowerCase().includes(query)
     );
   });
 
