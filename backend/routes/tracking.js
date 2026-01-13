@@ -11,7 +11,7 @@ router.get('/:trackingNumber', async (req, res) => {
     // Get shipment details
     const shipmentResult = await db.query(
       `SELECT 
-        tracking_number, customer_name, city, state, zip_code, 
+        tracking_number, customer_name, shipping_address, city, state, zip_code, 
         country, destination_country, delivery_days, status, created_at
        FROM shipments 
        WHERE tracking_number = $1`,
@@ -46,6 +46,7 @@ router.get('/:trackingNumber', async (req, res) => {
       status: shipment.status,
       customer: {
         name: shipment.customer_name,
+        address: shipment.shipping_address,
         city: shipment.city,
         state: shipment.state,
         zipCode: shipment.zip_code,
