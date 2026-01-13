@@ -54,7 +54,7 @@ router.get('/callback', async (req, res) => {
 // Get stores
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
-    const result = await db.query(`SELECT id, domain, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status, created_at FROM shopify_stores ORDER BY created_at DESC`);
+    const result = await db.query(`SELECT id, store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, status, created_at FROM shopify_stores ORDER BY created_at DESC`);
     res.json({ stores: result.rows });
   } catch (error) {
     console.error('Error fetching stores:', error);
@@ -62,19 +62,50 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
+// Add new store
+router.post('/stores', authMiddleware, async (req, res) => {
+  try {
+    const { store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event } = req.body;
+    
+    const result = await db.query(`
+      INSERT INTO shopify_stores (store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, status, created_at) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'active', NOW())
+      RETURNING id
+    `, [store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event]);
+    
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error adding store:', error);
+    res.status(500).json({ error: 'Failed to add store', message: error.message });
+  }
+});
+
 // Update store settings
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status } = req.body;
+    const { store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event } = req.body;
     
-    await db.query(`
-      UPDATE shopify_stores 
-      SET delivery_days = $1, send_offset = $2, fulfillment_time = $3, country_origin = $4, 
-          transit_country = $5, sorting_days = $6, parcel_point = $7, redelivery_active = $8, 
-          redelivery_days = $9, attempts = $10, status = $11
-      WHERE id = $12
-    `, [delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, redelivery_active, redelivery_days, attempts, status, id]);
+    // Hvis api_token er tom, behold den eksisterende
+    if (api_token) {
+      await db.query(`
+        UPDATE shopify_stores 
+        SET store_name = $1, domain = $2, api_token = $3, delivery_days = $4, send_offset = $5, 
+            fulfillment_time = $6, country_origin = $7, transit_country = $8, sorting_days = $9, 
+            parcel_point = $10, parcel_point_days = $11, redelivery_active = $12, redelivery_days = $13, 
+            attempts = $14, post_delivery_event = $15
+        WHERE id = $16
+      `, [store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, id]);
+    } else {
+      await db.query(`
+        UPDATE shopify_stores 
+        SET store_name = $1, domain = $2, delivery_days = $3, send_offset = $4, 
+            fulfillment_time = $5, country_origin = $6, transit_country = $7, sorting_days = $8, 
+            parcel_point = $9, parcel_point_days = $10, redelivery_active = $11, redelivery_days = $12, 
+            attempts = $13, post_delivery_event = $14
+        WHERE id = $15
+      `, [store_name, domain, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, id]);
+    }
     
     res.json({ success: true });
   } catch (error) {
