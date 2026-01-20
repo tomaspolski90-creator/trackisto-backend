@@ -147,34 +147,40 @@
                 <p style="color: #155724; margin: 0;">Thank you for contacting us. We'll get back to you within 24 hours.</p>
             </div>
 
-            <form class="contact-form" id="contactForm" name="contact" method="POST" action="https://submit-form.com/ojJ7v7EGe">
-                <input type="hidden" name="_redirect" value="https://rvslogistics.com/contact.html?success=true">
+            <form class="contact-form" id="contactForm" action="https://formsubmit.co/support@rvslogistics.com" method="POST">
+                <!-- FormSubmit configuration -->
+                <input type="hidden" name="_next" value="https://rvslogistics.com/contact.html?success=true">
+                <input type="hidden" name="_subject" value="New Contact Form Submission - RVS Logistics">
+                <input type="hidden" name="_captcha" value="false">
+                <input type="hidden" name="_template" value="table">
+                <input type="text" name="_honey" style="display:none">
+                
                 <div class="form-group">
                     <label>Full Name *</label>
-                    <input type="text" name="name" required placeholder="Your name">
+                    <input type="text" name="Name" required placeholder="Your name">
                 </div>
                 <div class="form-group">
                     <label>Email Address *</label>
-                    <input type="email" name="email" required placeholder="your@email.com">
+                    <input type="email" name="Email" required placeholder="your@email.com">
                 </div>
                 <div class="form-group">
                     <label>Subject</label>
-                    <select name="subject">
+                    <select name="Subject">
                         <option value="">Select a topic</option>
-                        <option value="tracking">Tracking Issue</option>
-                        <option value="delivery">Delivery Problem</option>
-                        <option value="general">General Inquiry</option>
-                        <option value="feedback">Feedback</option>
-                        <option value="other">Other</option>
+                        <option value="Tracking Issue">Tracking Issue</option>
+                        <option value="Delivery Problem">Delivery Problem</option>
+                        <option value="General Inquiry">General Inquiry</option>
+                        <option value="Feedback">Feedback</option>
+                        <option value="Other">Other</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Tracking Number (Optional)</label>
-                    <input type="text" name="tracking_number" placeholder="e.g. DK1768209661360">
+                    <input type="text" name="Tracking Number" placeholder="e.g. DK1768209661360">
                 </div>
                 <div class="form-group">
                     <label>Message *</label>
-                    <textarea name="message" required placeholder="How can we help you?"></textarea>
+                    <textarea name="Message" required placeholder="How can we help you?"></textarea>
                 </div>
                 <button type="submit" class="submit-btn">Send Message</button>
                 <p class="form-note">We'll get back to you within 24 hours</p>
