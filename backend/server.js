@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -14,11 +13,13 @@ const authRoutes = require('./routes/auth');
 const shipmentRoutes = require('./routes/shipments');
 const trackingRoutes = require('./routes/tracking');
 const shopifyRoutes = require('./routes/shopify');
+const contactRoutes = require('./routes/contact');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/shopify', shopifyRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
