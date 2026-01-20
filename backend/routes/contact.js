@@ -123,7 +123,7 @@ router.post('/', async (req, res) => {
 
     console.log('[Contact] Sending email via Resend API...');
 
-    // Send email using Resend API
+    // Send email using Resend API - now using verified domain
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -131,7 +131,7 @@ router.post('/', async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'RVS Logistics <onboarding@resend.dev>',
+        from: 'RVS Logistics <noreply@rvslogistics.com>',
         to: 'support@rvslogistics.com',
         reply_to: email,
         subject: `New Contact: ${subject || 'General Inquiry'} - ${name}`,
