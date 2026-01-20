@@ -3,20 +3,29 @@ const router = express.Router();
 const nodemailer = require('nodemailer');
 
 // Email transporter configuration for Titan Mail
+// Using port 587 with STARTTLS (more reliable on cloud platforms)
 const transporter = nodemailer.createTransport({
   host: 'smtp.titan.email',
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false, // Use STARTTLS
   auth: {
     user: process.env.EMAIL_USER || 'support@rvslogistics.com',
-    pass: process.env.EMAIL_PASS // Du skal tilføje denne i Render environment variables
-  }
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 30000, // 30 seconds
+  greetingTimeout: 30000,
+  socketTimeout: 30000
 });
 
 // Contact form endpoint
 router.post('/', async (req, res) => {
   try {
     const { name, email, subject, trackingNumber, message } = req.body;
+
+    console.log('[Contact] Received form submission from:', email);
 
     // Validate required fields
     if (!name || !email || !message) {
@@ -131,6 +140,8 @@ router.post('/', async (req, res) => {
 </html>
     `;
 
+    console.log('[Contact] Sending email to support...');
+
     // Send email to support
     await transporter.sendMail({
       from: '"RVS Logistics" <support@rvslogistics.com>',
@@ -139,6 +150,8 @@ router.post('/', async (req, res) => {
       subject: `New Contact: ${subject || 'General Inquiry'} - ${name}`,
       html: htmlTemplate
     });
+
+    console.log('[Contact] Email sent to support successfully');
 
     // Send confirmation email to customer
     const customerTemplate = `
@@ -212,6 +225,8 @@ router.post('/', async (req, res) => {
 </html>
     `;
 
+    console.log('[Contact] Sending confirmation email to customer...');
+
     await transporter.sendMail({
       from: '"RVS Logistics" <support@rvslogistics.com>',
       to: email,
@@ -219,10 +234,12 @@ router.post('/', async (req, res) => {
       html: customerTemplate
     });
 
+    console.log('[Contact] Confirmation email sent successfully');
+
     res.json({ success: true, message: 'Message sent successfully' });
 
   } catch (error) {
-    console.error('Contact form error:', error);
+    console.error('[Contact] Form error:', error.message);
     res.status(500).json({ error: 'Failed to send message. Please try again.' });
   }
 });
