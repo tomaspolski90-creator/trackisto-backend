@@ -3,10 +3,8 @@ const router = express.Router();
 const db = require('../config/database');
 const crypto = require('crypto');
 
-const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID;
-const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET;
-const BACKEND_URL = 'https://trackisto-backend.onrender.com';
-const FRONTEND_URL = 'https://playful-bombolone-e5db3c.netlify.app';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://trackisto-backend.onrender.com';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://playful-bombolone-e5db3c.netlify.app';
 
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -14,47 +12,163 @@ const authMiddleware = (req, res, next) => {
   next();
 };
 
-// OAuth Step 1
-router.get('/auth', (req, res) => {
-  const { shop } = req.query;
-  if (!shop) return res.status(400).json({ message: 'Shop parameter required' });
-  const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,read_locations';
-  const redirectUri = `${BACKEND_URL}/api/shopify/callback`;
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${nonce}`;
-  res.redirect(authUrl);
+// ============================================
+// OAUTH FLOW - MED PER-STORE CREDENTIALS
+// ============================================
+
+// OAuth Step 1 - Start OAuth for en specifik store (bruger store's credentials)
+router.get('/auth/:storeId', async (req, res) => {
+  const { storeId } = req.params;
+  
+  try {
+    // Hent store's credentials fra database
+    const storeResult = await db.query(
+      'SELECT id, domain, client_id, client_secret FROM shopify_stores WHERE id = $1',
+      [storeId]
+    );
+    
+    if (storeResult.rows.length === 0) {
+      return res.status(404).send('Store not found');
+    }
+    
+    const store = storeResult.rows[0];
+    
+    if (!store.client_id || !store.client_secret) {
+      return res.status(400).send('Store missing Client ID or Client Secret. Please add credentials first.');
+    }
+    
+    if (!store.domain) {
+      return res.status(400).send('Store missing domain');
+    }
+    
+    const scopes = 'read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,read_locations';
+    const redirectUri = `${BACKEND_URL}/api/shopify/callback`;
+    const nonce = crypto.randomBytes(16).toString('hex');
+    
+    // Gem storeId i state så vi kan hente det igen i callback
+    const state = Buffer.from(JSON.stringify({ storeId: store.id, nonce })).toString('base64');
+    
+    const authUrl = `https://${store.domain}/admin/oauth/authorize?client_id=${store.client_id}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    
+    console.log(`[OAuth] Starting auth for store ${storeId} (${store.domain})`);
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('[OAuth] Error starting auth:', error);
+    res.status(500).send('Server error during OAuth start');
+  }
 });
 
-// OAuth Step 2
+// OAuth Step 2 - Callback (henter credentials fra database baseret på state)
 router.get('/callback', async (req, res) => {
-  const { code, shop } = req.query;
-  if (!code || !shop) return res.redirect(`${FRONTEND_URL}/?error=missing_params`);
+  const { code, shop, state } = req.query;
+  
+  console.log('[OAuth Callback] Received:', { code: code ? 'yes' : 'no', shop, state: state ? 'yes' : 'no' });
+  
+  if (!code) {
+    return res.redirect(`${FRONTEND_URL}/?error=missing_code`);
+  }
+  
   try {
-    const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    let storeId = null;
+    let store = null;
+    
+    // Prøv at decode state (ny flow med storeId)
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        storeId = stateData.storeId;
+        console.log('[OAuth Callback] Decoded storeId from state:', storeId);
+      } catch (e) {
+        console.log('[OAuth Callback] Could not decode state, using shop parameter');
+      }
+    }
+    
+    // Hent store - enten via storeId eller via shop domain
+    if (storeId) {
+      const storeResult = await db.query(
+        'SELECT * FROM shopify_stores WHERE id = $1',
+        [storeId]
+      );
+      if (storeResult.rows.length > 0) {
+        store = storeResult.rows[0];
+      }
+    }
+    
+    // Fallback: Find store via shop domain
+    if (!store && shop) {
+      const storeResult = await db.query(
+        'SELECT * FROM shopify_stores WHERE domain = $1',
+        [shop]
+      );
+      if (storeResult.rows.length > 0) {
+        store = storeResult.rows[0];
+      }
+    }
+    
+    if (!store) {
+      console.error('[OAuth Callback] Store not found');
+      return res.redirect(`${FRONTEND_URL}/?error=store_not_found`);
+    }
+    
+    // Tjek at store har credentials
+    if (!store.client_id || !store.client_secret) {
+      console.error('[OAuth Callback] Store missing credentials');
+      return res.redirect(`${FRONTEND_URL}/?error=missing_credentials`);
+    }
+    
+    // Byt code til access token med store's credentials
+    console.log(`[OAuth Callback] Exchanging code for token for store ${store.domain}`);
+    const response = await fetch(`https://${store.domain}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: SHOPIFY_CLIENT_ID, client_secret: SHOPIFY_CLIENT_SECRET, code })
+      body: JSON.stringify({
+        client_id: store.client_id,
+        client_secret: store.client_secret,
+        code
+      })
     });
+    
     const data = await response.json();
-    if (!data.access_token) return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
-
-    const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [shop]);
-    if (existingStore.rows.length > 0) {
-      await db.query('UPDATE shopify_stores SET api_token = $1, status = $2 WHERE domain = $3', [data.access_token, 'active', shop]);
-    } else {
-      await db.query(`INSERT INTO shopify_stores (domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, status, created_at) VALUES ($1, $2, 7, 0, '16:00', 'United Kingdom', 'active', NOW())`, [shop, data.access_token]);
+    
+    if (!data.access_token) {
+      console.error('[OAuth Callback] Failed to get access token:', data);
+      return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
     }
-    res.redirect(`${FRONTEND_URL}/?success=store_connected&shop=${shop}`);
+    
+    // Gem access token og marker som connected
+    await db.query(
+      'UPDATE shopify_stores SET api_token = $1, is_connected = true, status = $2 WHERE id = $3',
+      [data.access_token, 'active', store.id]
+    );
+    
+    console.log(`[OAuth Callback] Store ${store.id} (${store.domain}) connected successfully!`);
+    res.redirect(`${FRONTEND_URL}/?success=store_connected&shop=${store.domain}`);
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('[OAuth Callback] Error:', error);
     res.redirect(`${FRONTEND_URL}/?error=server_error`);
   }
 });
 
-// Get stores
+// ============================================
+// STORE MANAGEMENT
+// ============================================
+
+// Get all stores (inkluderer is_connected og has_credentials)
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
-    const result = await db.query(`SELECT id, store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, status, created_at FROM shopify_stores ORDER BY created_at DESC`);
+    const result = await db.query(`
+      SELECT 
+        id, store_name, domain, delivery_days, send_offset, fulfillment_time,
+        country_origin, transit_country, post_delivery_event, sorting_days,
+        parcel_point, parcel_point_days, redelivery_active, redelivery_days,
+        attempts, status, created_at,
+        client_id, client_secret,
+        COALESCE(is_connected, false) as is_connected,
+        (client_id IS NOT NULL AND client_id != '' AND client_secret IS NOT NULL AND client_secret != '') as has_credentials,
+        (api_token IS NOT NULL AND api_token != '') as has_token
+      FROM shopify_stores 
+      ORDER BY created_at DESC
+    `);
     res.json({ stores: result.rows });
   } catch (error) {
     console.error('Error fetching stores:', error);
@@ -62,55 +176,144 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new store
+// Add new store (nu med client_id og client_secret)
 router.post('/stores', authMiddleware, async (req, res) => {
   try {
-    const { store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event } = req.body;
+    const { 
+      store_name, domain, client_id, client_secret,
+      delivery_days = 7, send_offset = 0, fulfillment_time = '16:00',
+      country_origin = 'United Kingdom', transit_country = '',
+      sorting_days = 3, parcel_point = true, parcel_point_days = 3,
+      redelivery_active = false, redelivery_days = 3, attempts = 1, 
+      post_delivery_event = 'None'
+    } = req.body;
+    
+    if (!domain) {
+      return res.status(400).json({ error: 'Domain is required' });
+    }
+    
+    // Tjek om store allerede eksisterer
+    const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [domain]);
+    if (existingStore.rows.length > 0) {
+      return res.status(400).json({ error: 'Store with this domain already exists' });
+    }
     
     const result = await db.query(`
-      INSERT INTO shopify_stores (store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, status, created_at) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'active', NOW())
+      INSERT INTO shopify_stores (
+        store_name, domain, client_id, client_secret,
+        delivery_days, send_offset, fulfillment_time,
+        country_origin, transit_country, sorting_days, 
+        parcel_point, parcel_point_days,
+        redelivery_active, redelivery_days, attempts, 
+        post_delivery_event, status, is_connected, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'inactive', false, NOW())
       RETURNING id
-    `, [store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event]);
+    `, [
+      store_name, domain, client_id, client_secret,
+      delivery_days, send_offset, fulfillment_time,
+      country_origin, transit_country, sorting_days,
+      parcel_point, parcel_point_days,
+      redelivery_active, redelivery_days, attempts,
+      post_delivery_event
+    ]);
     
-    res.json({ success: true, id: result.rows[0].id });
+    res.json({ 
+      success: true, 
+      id: result.rows[0].id,
+      message: client_id && client_secret 
+        ? 'Store created! Click "Connect to Shopify" to complete setup.' 
+        : 'Store created! Add Client ID and Secret, then connect to Shopify.'
+    });
   } catch (error) {
     console.error('Error adding store:', error);
     res.status(500).json({ error: 'Failed to add store', message: error.message });
   }
 });
 
-// Update store settings
+// Update store settings (inkl. client_id og client_secret)
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event } = req.body;
+    const { 
+      store_name, domain, client_id, client_secret,
+      delivery_days, send_offset, fulfillment_time, 
+      country_origin, transit_country, sorting_days, 
+      parcel_point, parcel_point_days, redelivery_active, 
+      redelivery_days, attempts, post_delivery_event 
+    } = req.body;
     
-    // Hvis api_token er tom, behold den eksisterende
-    if (api_token) {
-      await db.query(`
-        UPDATE shopify_stores 
-        SET store_name = $1, domain = $2, api_token = $3, delivery_days = $4, send_offset = $5, 
-            fulfillment_time = $6, country_origin = $7, transit_country = $8, sorting_days = $9, 
-            parcel_point = $10, parcel_point_days = $11, redelivery_active = $12, redelivery_days = $13, 
-            attempts = $14, post_delivery_event = $15
-        WHERE id = $16
-      `, [store_name, domain, api_token, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, id]);
-    } else {
-      await db.query(`
-        UPDATE shopify_stores 
-        SET store_name = $1, domain = $2, delivery_days = $3, send_offset = $4, 
-            fulfillment_time = $5, country_origin = $6, transit_country = $7, sorting_days = $8, 
-            parcel_point = $9, parcel_point_days = $10, redelivery_active = $11, redelivery_days = $12, 
-            attempts = $13, post_delivery_event = $14
-        WHERE id = $15
-      `, [store_name, domain, delivery_days, send_offset, fulfillment_time, country_origin, transit_country, sorting_days, parcel_point, parcel_point_days, redelivery_active, redelivery_days, attempts, post_delivery_event, id]);
+    // Hent eksisterende store
+    const existing = await db.query('SELECT * FROM shopify_stores WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Store not found' });
     }
     
-    res.json({ success: true });
+    const currentStore = existing.rows[0];
+    
+    // Tjek om credentials ændres - i så fald skal is_connected resettes
+    let resetConnection = false;
+    if ((client_id && client_id !== currentStore.client_id) || 
+        (client_secret && client_secret !== currentStore.client_secret)) {
+      resetConnection = true;
+    }
+    
+    // Byg update query dynamisk
+    let updateFields = [];
+    let params = [];
+    let paramCount = 1;
+    
+    if (store_name !== undefined) { updateFields.push(`store_name = $${paramCount++}`); params.push(store_name); }
+    if (domain !== undefined) { updateFields.push(`domain = $${paramCount++}`); params.push(domain); }
+    if (client_id !== undefined) { updateFields.push(`client_id = $${paramCount++}`); params.push(client_id); }
+    if (client_secret !== undefined) { updateFields.push(`client_secret = $${paramCount++}`); params.push(client_secret); }
+    if (delivery_days !== undefined) { updateFields.push(`delivery_days = $${paramCount++}`); params.push(delivery_days); }
+    if (send_offset !== undefined) { updateFields.push(`send_offset = $${paramCount++}`); params.push(send_offset); }
+    if (fulfillment_time !== undefined) { updateFields.push(`fulfillment_time = $${paramCount++}`); params.push(fulfillment_time); }
+    if (country_origin !== undefined) { updateFields.push(`country_origin = $${paramCount++}`); params.push(country_origin); }
+    if (transit_country !== undefined) { updateFields.push(`transit_country = $${paramCount++}`); params.push(transit_country); }
+    if (sorting_days !== undefined) { updateFields.push(`sorting_days = $${paramCount++}`); params.push(sorting_days); }
+    if (parcel_point !== undefined) { updateFields.push(`parcel_point = $${paramCount++}`); params.push(parcel_point); }
+    if (parcel_point_days !== undefined) { updateFields.push(`parcel_point_days = $${paramCount++}`); params.push(parcel_point_days); }
+    if (redelivery_active !== undefined) { updateFields.push(`redelivery_active = $${paramCount++}`); params.push(redelivery_active); }
+    if (redelivery_days !== undefined) { updateFields.push(`redelivery_days = $${paramCount++}`); params.push(redelivery_days); }
+    if (attempts !== undefined) { updateFields.push(`attempts = $${paramCount++}`); params.push(attempts); }
+    if (post_delivery_event !== undefined) { updateFields.push(`post_delivery_event = $${paramCount++}`); params.push(post_delivery_event); }
+    
+    // Reset connection hvis credentials ændres
+    if (resetConnection) {
+      updateFields.push(`is_connected = false`);
+      updateFields.push(`api_token = NULL`);
+    }
+    
+    params.push(id);
+    
+    await db.query(
+      `UPDATE shopify_stores SET ${updateFields.join(', ')} WHERE id = $${paramCount}`,
+      params
+    );
+    
+    res.json({ 
+      success: true,
+      message: resetConnection 
+        ? 'Store updated. Credentials changed - please reconnect to Shopify.' 
+        : 'Store updated successfully'
+    });
   } catch (error) {
     console.error('Error updating store:', error);
     res.status(500).json({ error: 'Failed to update store' });
+  }
+});
+
+// Toggle store status
+router.put('/stores/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await db.query('UPDATE shopify_stores SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating store status:', error);
+    res.status(500).json({ error: 'Failed to update status' });
   }
 });
 
@@ -126,37 +329,51 @@ router.delete('/stores/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== PENDING ORDERS (KUN UNFULFILLED) ==========
+// ============================================
+// PENDING ORDERS (KUN UNFULFILLED)
+// ============================================
 router.get('/pending-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Pending Orders] Fetching unfulfilled orders...');
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    
+    // Kun hent fra CONNECTED og ACTIVE stores
+    const storesResult = await db.query(
+      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      ['active']
+    );
     const stores = storesResult.rows;
+    console.log(`[Pending Orders] Found ${stores.length} connected stores`);
+    
     let allOrders = [];
 
     for (const store of stores) {
-      const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`, {
-        headers: { 'X-Shopify-Access-Token': store.api_token }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[Pending Orders] Store ${store.domain}: Found ${data.orders?.length || 0} unfulfilled orders`);
+      try {
+        const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=open&fulfillment_status=unfulfilled&limit=50`, {
+          headers: { 'X-Shopify-Access-Token': store.api_token }
+        });
         
-        const mappedOrders = (data.orders || []).map(order => ({
-          id: order.id,
-          order_number: order.order_number,
-          customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
-          country: order.shipping_address?.country || 'Unknown',
-          total_price: order.total_price,
-          currency: order.currency,
-          created_at: order.created_at,
-          fulfillment_status: order.fulfillment_status || 'unfulfilled',
-          store_domain: store.domain
-        }));
-        allOrders = [...allOrders, ...mappedOrders];
-      } else {
-        console.error(`[Pending Orders] Error fetching from ${store.domain}:`, response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[Pending Orders] Store ${store.domain}: Found ${data.orders?.length || 0} unfulfilled orders`);
+          
+          const mappedOrders = (data.orders || []).map(order => ({
+            id: order.id,
+            order_number: order.order_number,
+            customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
+            country: order.shipping_address?.country || 'Unknown',
+            total_price: order.total_price,
+            currency: order.currency,
+            created_at: order.created_at,
+            fulfillment_status: order.fulfillment_status || 'unfulfilled',
+            store_domain: store.domain,
+            store_id: store.id
+          }));
+          allOrders = [...allOrders, ...mappedOrders];
+        } else {
+          console.error(`[Pending Orders] Error fetching from ${store.domain}:`, response.status);
+        }
+      } catch (err) {
+        console.error(`[Pending Orders] Error fetching from ${store.domain}:`, err.message);
       }
     }
 
@@ -169,38 +386,47 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== FULFILLED ORDERS ==========
+// ============================================
+// FULFILLED ORDERS
+// ============================================
 router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Fulfilled Orders] Fetching fulfilled orders from Shopify...');
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const storesResult = await db.query(
+      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      ['active']
+    );
     const stores = storesResult.rows;
     let allOrders = [];
 
     for (const store of stores) {
-      const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=any&fulfillment_status=shipped&limit=50`, {
-        headers: { 'X-Shopify-Access-Token': store.api_token }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[Fulfilled Orders] Store ${store.domain}: Found ${data.orders?.length || 0} fulfilled orders`);
+      try {
+        const response = await fetch(`https://${store.domain}/admin/api/2024-01/orders.json?status=any&fulfillment_status=shipped&limit=50`, {
+          headers: { 'X-Shopify-Access-Token': store.api_token }
+        });
         
-        const mappedOrders = (data.orders || []).map(order => ({
-          id: order.id,
-          order_number: order.order_number,
-          customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
-          country: order.shipping_address?.country || 'Unknown',
-          total_price: order.total_price,
-          currency: order.currency,
-          created_at: order.created_at,
-          fulfillment_status: order.fulfillment_status || 'fulfilled',
-          store_domain: store.domain,
-          tracking_number: order.fulfillments?.[0]?.tracking_number || null
-        }));
-        allOrders = [...allOrders, ...mappedOrders];
-      } else {
-        console.error(`[Fulfilled Orders] Error fetching from ${store.domain}:`, response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[Fulfilled Orders] Store ${store.domain}: Found ${data.orders?.length || 0} fulfilled orders`);
+          
+          const mappedOrders = (data.orders || []).map(order => ({
+            id: order.id,
+            order_number: order.order_number,
+            customer_name: order.shipping_address ? `${order.shipping_address.first_name || ''} ${order.shipping_address.last_name || ''}`.trim() : 'Unknown',
+            country: order.shipping_address?.country || 'Unknown',
+            total_price: order.total_price,
+            currency: order.currency,
+            created_at: order.created_at,
+            fulfillment_status: order.fulfillment_status || 'fulfilled',
+            store_domain: store.domain,
+            tracking_number: order.fulfillments?.[0]?.tracking_number || null
+          }));
+          allOrders = [...allOrders, ...mappedOrders];
+        } else {
+          console.error(`[Fulfilled Orders] Error fetching from ${store.domain}:`, response.status);
+        }
+      } catch (err) {
+        console.error(`[Fulfilled Orders] Error fetching from ${store.domain}:`, err.message);
       }
     }
 
@@ -213,11 +439,17 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== MANUEL FULFILL ==========
+// ============================================
+// MANUEL FULFILL
+// ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[Fetch-Fulfill] Manual trigger started...');
   try {
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    // Kun fra CONNECTED stores
+    const storesResult = await db.query(
+      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      ['active']
+    );
     let fulfilledCount = 0;
     let errors = [];
 
@@ -305,12 +537,13 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== AUTO UPDATE TRACKING EVENTS ==========
+// ============================================
+// AUTO UPDATE TRACKING EVENTS
+// ============================================
 async function updateTrackingEvents() {
   console.log('[Auto-Events] Starting automatic tracking events update...');
   
   try {
-    // Hent alle aktive shipments der ikke er delivered med alle store settings
     const shipmentsResult = await db.query(`
       SELECT s.*, 
              ss.country_origin, 
@@ -346,78 +579,34 @@ async function updateShipmentEvents(shipment) {
   const now = new Date();
   const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
   
-  // Hent eksisterende events for denne shipment
   const eventsResult = await db.query(
     'SELECT status FROM tracking_events WHERE shipment_id = $1',
     [shipment.id]
   );
   const existingStatuses = eventsResult.rows.map(e => e.status);
   
-  // Hent alle settings fra store
   const originCountry = shipment.origin_country || shipment.country_origin || 'United Kingdom';
   const transitCountry = shipment.transit_country || 'Netherlands';
   const destinationCountry = shipment.destination_country || shipment.country || 'France';
   const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 7;
   const sortingDays = shipment.sorting_days || shipment.store_sorting_days || 3;
   const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
-  const parcelPointDays = shipment.parcel_point_days || 3;
-  const redeliveryActive = shipment.redelivery_active === true || shipment.redelivery_active === 'Yes';
-  const redeliveryDays = shipment.redelivery_days || 3;
-  const attempts = shipment.attempts || 1;
   
-  // Beregn dynamiske dage baseret på delivery_days og sorting_days
   const transitDay = Math.max(1, Math.floor(sortingDays / 2));
   const customsDay = Math.floor(deliveryDays / 2);
   const clearedDay = customsDay + 1;
   const outForDeliveryDay = deliveryDays - 1;
   
-  // Definer tracking events baseret på store settings
   const eventSchedule = [
-    {
-      day: 0,
-      status: 'Label Created',
-      location: `${originCountry}, ${originCountry}`,
-      description: `Label created in ${originCountry}`
-    },
-    {
-      day: 1,
-      status: 'Package Received',
-      location: `Export hub, ${originCountry}`,
-      description: `Package processed at export hub, ${originCountry}`
-    },
-    {
-      day: Math.min(2, transitDay + 1),
-      status: 'Departed Facility',
-      location: `${originCountry} Intl Airport`,
-      description: `Departed via ${originCountry} Intl Airport`
-    },
-    {
-      day: transitDay + 2,
-      status: 'In Transit',
-      location: `${transitCountry}`,
-      description: `In transit through ${transitCountry}`
-    },
-    {
-      day: customsDay,
-      status: 'Customs Hold',
-      location: `Customs, ${destinationCountry}`,
-      description: `Customs hold in ${destinationCountry}`
-    },
-    {
-      day: clearedDay,
-      status: 'Cleared Customs',
-      location: `Customs, ${destinationCountry}`,
-      description: `Cleared customs in ${destinationCountry}`
-    },
-    {
-      day: outForDeliveryDay,
-      status: 'Out for Delivery',
-      location: `${shipment.city || 'Local'}, ${destinationCountry}`,
-      description: `Out for delivery in ${shipment.city || 'your area'}`
-    }
+    { day: 0, status: 'Label Created', location: `${originCountry}, ${originCountry}`, description: `Label created in ${originCountry}` },
+    { day: 1, status: 'Package Received', location: `Export hub, ${originCountry}`, description: `Package processed at export hub, ${originCountry}` },
+    { day: Math.min(2, transitDay + 1), status: 'Departed Facility', location: `${originCountry} Intl Airport`, description: `Departed via ${originCountry} Intl Airport` },
+    { day: transitDay + 2, status: 'In Transit', location: `${transitCountry}`, description: `In transit through ${transitCountry}` },
+    { day: customsDay, status: 'Customs Hold', location: `Customs, ${destinationCountry}`, description: `Customs hold in ${destinationCountry}` },
+    { day: clearedDay, status: 'Cleared Customs', location: `Customs, ${destinationCountry}`, description: `Cleared customs in ${destinationCountry}` },
+    { day: outForDeliveryDay, status: 'Out for Delivery', location: `${shipment.city || 'Local'}, ${destinationCountry}`, description: `Out for delivery in ${shipment.city || 'your area'}` }
   ];
   
-  // Tilføj parcel point event hvis aktiveret
   if (parcelPoint) {
     eventSchedule.push({
       day: outForDeliveryDay + 1,
@@ -427,14 +616,11 @@ async function updateShipmentEvents(shipment) {
     });
   }
   
-  // Tilføj events der mangler baseret på hvor mange dage der er gået
   for (const event of eventSchedule) {
     if (daysSinceCreation >= event.day && !existingStatuses.includes(event.status)) {
-      // Beregn event dato
       const eventDate = new Date(createdAt);
       eventDate.setDate(eventDate.getDate() + event.day);
       
-      // Generer tilfældig tid mellem 08:00 og 18:00
       const hour = 8 + Math.floor(Math.random() * 10);
       const minute = Math.floor(Math.random() * 60);
       const eventTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
@@ -442,33 +628,19 @@ async function updateShipmentEvents(shipment) {
       await db.query(`
         INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      `, [
-        shipment.id,
-        event.status,
-        event.location,
-        event.description,
-        eventDate.toISOString().split('T')[0],
-        eventTime
-      ]);
+      `, [shipment.id, event.status, event.location, event.description, eventDate.toISOString().split('T')[0], eventTime]);
       
       console.log(`[Auto-Events] Added "${event.status}" for shipment ${shipment.tracking_number}`);
       
-      // Opdater shipment status baseret på event
       let newStatus = 'label_created';
-      if (event.status === 'Package Received') newStatus = 'label_created';
-      else if (event.status === 'Departed Facility') newStatus = 'in_transit';
-      else if (event.status === 'In Transit') newStatus = 'in_transit';
-      else if (event.status === 'Customs Hold') newStatus = 'in_transit';
-      else if (event.status === 'Cleared Customs') newStatus = 'in_transit';
-      else if (event.status === 'Out for Delivery') newStatus = 'out_for_delivery';
-      else if (event.status === 'Available at Parcel Point') newStatus = 'out_for_delivery';
+      if (['Departed Facility', 'In Transit', 'Customs Hold', 'Cleared Customs'].includes(event.status)) newStatus = 'in_transit';
+      else if (['Out for Delivery', 'Available at Parcel Point'].includes(event.status)) newStatus = 'out_for_delivery';
       
       await db.query('UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, shipment.id]);
     }
   }
 }
 
-// Endpoint til manuelt at trigger event updates (til test)
 router.post('/update-tracking-events', authMiddleware, async (req, res) => {
   try {
     await updateTrackingEvents();
@@ -479,7 +651,9 @@ router.post('/update-tracking-events', authMiddleware, async (req, res) => {
   }
 });
 
-// ========== HELPER FUNCTIONS ==========
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 async function fetchUnfulfilledOrders(store) {
   try {
@@ -512,18 +686,12 @@ async function fulfillOrderInShopify(store, order, trackingNumber) {
 
   const fulfillResponse = await fetch(`https://${store.domain}/admin/api/2024-01/fulfillments.json`, {
     method: 'POST',
-    headers: { 
-      'X-Shopify-Access-Token': store.api_token, 
-      'Content-Type': 'application/json' 
-    },
+    headers: { 'X-Shopify-Access-Token': store.api_token, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fulfillment: {
         line_items_by_fulfillment_order: [{
           fulfillment_order_id: fo.id,
-          fulfillment_order_line_items: fo.line_items.map(li => ({
-            id: li.id,
-            quantity: li.fulfillable_quantity
-          }))
+          fulfillment_order_line_items: fo.line_items.map(li => ({ id: li.id, quantity: li.fulfillable_quantity }))
         }],
         tracking_info: {
           number: trackingNumber,
@@ -560,11 +728,13 @@ async function processAutoFulfillment() {
   
   console.log(`[Auto-Fulfill] Danish time: ${currentTimeStr}`);
 
-  // Kør også tracking events update
   await updateTrackingEvents();
 
   try {
-    const storesResult = await db.query('SELECT * FROM shopify_stores WHERE status = $1', ['active']);
+    const storesResult = await db.query(
+      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      ['active']
+    );
     
     for (const store of storesResult.rows) {
       const fulfillmentTime = store.fulfillment_time || '16:00';
