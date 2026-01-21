@@ -3,7 +3,6 @@ import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://trackisto-backend.onrender.com';
 
-// Hent page fra URL hash
 const getPageFromHash = () => {
   const hash = window.location.hash.replace('#', '');
   const validPages = ['dashboard', 'shipments', 'missing', 'shopify', 'api'];
@@ -22,7 +21,8 @@ function App() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
   const [storeForm, setStoreForm] = useState({
-    store_name: '', domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
+    store_name: '', domain: '', client_id: '', client_secret: '',
+    delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
     country_origin: 'United Kingdom', transit_country: '', post_delivery_event: 'None',
     sorting_days: 3, parcel_point: true, parcel_point_days: 3,
     redelivery_active: false, redelivery_days: 3, attempts: 1
@@ -43,7 +43,6 @@ function App() {
   });
   const [generatedTracking, setGeneratedTracking] = useState(null);
 
-  // Opdater URL hash når page ændres
   const navigateTo = (page) => {
     setCurrentPage(page);
     window.location.hash = page;
@@ -87,51 +86,34 @@ function App() {
         setPendingOrders(data.orders || []);
         setDashboardStats(prev => ({ ...prev, pending: data.orders?.length || 0 }));
       }
-    } catch (error) {
-      console.error('Error fetching pending orders:', error);
-    }
+    } catch (error) { console.error('Error fetching pending orders:', error); }
     setPendingLoading(false);
   };
 
   const fetchFulfilledOrders = async (storeFilter = selectedStore) => {
     setPendingLoading(true);
     try {
-      // Hent fra shipments tabellen (vores database) i stedet for Shopify API
-      const response = await fetch(`${API_URL}/api/shipments`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(`${API_URL}/api/shipments`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         let orders = data.shipments || [];
-        
-        // Filtrer på store hvis valgt
         if (storeFilter !== 'all') {
           const store = stores.find(s => s.domain === storeFilter);
-          if (store) {
-            orders = orders.filter(o => o.shopify_store_id === store.id);
-          }
+          if (store) orders = orders.filter(o => o.shopify_store_id === store.id);
         }
-        
         setFulfilledOrders(orders);
       }
-    } catch (error) {
-      console.error('Error fetching fulfilled orders:', error);
-    }
+    } catch (error) { console.error('Error fetching fulfilled orders:', error); }
     setPendingLoading(false);
   };
 
   const fetchAndFulfillOrders = async () => {
-    if (!window.confirm('This will fulfill ALL pending orders and send tracking emails to customers. Continue?')) {
-      return;
-    }
-    
+    if (!window.confirm('This will fulfill ALL pending orders and send tracking emails to customers. Continue?')) return;
     setPendingLoading(true);
     try {
       const response = await fetch(`${API_URL}/api/shopify/fetch-and-fulfill`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       if (response.ok) {
         const data = await response.json();
         alert(`✅ ${data.message}`);
@@ -141,9 +123,7 @@ function App() {
         const data = await response.json();
         alert('Failed to fulfill orders: ' + data.message);
       }
-    } catch (error) {
-      alert('Error: ' + error.message);
-    }
+    } catch (error) { alert('Error: ' + error.message); }
     setPendingLoading(false);
   };
 
@@ -151,7 +131,6 @@ function App() {
     ? pendingOrders 
     : pendingOrders.filter(order => order.store_domain === selectedStore);
 
-  // Filter for fulfilled orders med søgning (nu fra shipments tabellen)
   const filteredFulfilledOrders = fulfilledOrders.filter(order => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -182,11 +161,8 @@ function App() {
     if (token) { setIsLoggedIn(true); fetchDashboardData(); }
   }, [token, fetchDashboardData]);
 
-  // Lyt efter hash changes (browser back/forward)
   useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentPage(getPageFromHash());
-    };
+    const handleHashChange = () => setCurrentPage(getPageFromHash());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -226,7 +202,8 @@ function App() {
 
   const resetStoreForm = () => {
     setStoreForm({
-      store_name: '', domain: '', api_token: '', delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
+      store_name: '', domain: '', client_id: '', client_secret: '',
+      delivery_days: 7, send_offset: 0, fulfillment_time: '10:00',
       country_origin: 'United Kingdom', transit_country: '', post_delivery_event: 'None',
       sorting_days: 3, parcel_point: true, parcel_point_days: 3,
       redelivery_active: false, redelivery_days: 3, attempts: 1
@@ -244,28 +221,43 @@ function App() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(storeForm)
       });
-      if (response.ok) { fetchDashboardData(); setShowAddStore(false); resetStoreForm(); }
-      else { const data = await response.json(); alert('Failed to save store: ' + data.message); }
+      if (response.ok) { 
+        const data = await response.json();
+        if (data.message) alert(`✅ ${data.message}`);
+        fetchDashboardData(); 
+        setShowAddStore(false); 
+        resetStoreForm(); 
+      }
+      else { const data = await response.json(); alert('Failed to save store: ' + (data.error || data.message)); }
     } catch (error) { alert('Failed to save store: ' + error.message); }
     setLoading(false);
   };
 
   const handleEditStore = (store) => {
     setStoreForm({
-      store_name: store.store_name || '', domain: store.domain || '', api_token: '',
-      delivery_days: store.delivery_days || 7, send_offset: store.send_offset || 0,
+      store_name: store.store_name || '', 
+      domain: store.domain || '', 
+      client_id: store.client_id || '',
+      client_secret: store.client_secret || '',
+      delivery_days: store.delivery_days || 7, 
+      send_offset: store.send_offset || 0,
       fulfillment_time: store.fulfillment_time || '10:00',
       country_origin: store.country_origin || 'United Kingdom',
-      transit_country: store.transit_country || '', post_delivery_event: store.post_delivery_event || 'None',
-      sorting_days: store.sorting_days || 3, parcel_point: store.parcel_point !== false,
-      parcel_point_days: store.parcel_point_days || 3, redelivery_active: store.redelivery_active || false,
-      redelivery_days: store.redelivery_days || 3, attempts: store.attempts || 1
+      transit_country: store.transit_country || '', 
+      post_delivery_event: store.post_delivery_event || 'None',
+      sorting_days: store.sorting_days || 3, 
+      parcel_point: store.parcel_point !== false,
+      parcel_point_days: store.parcel_point_days || 3, 
+      redelivery_active: store.redelivery_active || false,
+      redelivery_days: store.redelivery_days || 3, 
+      attempts: store.attempts || 1
     });
-    setEditingStore(store); setShowAddStore(true);
+    setEditingStore(store); 
+    setShowAddStore(true);
   };
 
   const handleDeleteStore = async (storeId) => {
-    if (!window.confirm('Are you sure?')) return;
+    if (!window.confirm('Are you sure you want to delete this store?')) return;
     try {
       const response = await fetch(`${API_URL}/api/shopify/stores/${storeId}`, {
         method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
@@ -285,6 +277,17 @@ function App() {
       });
       if (response.ok) fetchDashboardData();
     } catch (error) { console.error('Failed to toggle store status:', error); }
+  };
+
+  // Connect to Shopify - åbner OAuth flow
+  const handleConnectToShopify = (store) => {
+    if (!store.client_id || !store.client_secret) {
+      alert('Please add Client ID and Client Secret first.\n\nEdit the store to add your Shopify App credentials.');
+      return;
+    }
+    // Åbn OAuth flow i nyt vindue
+    const installUrl = `${API_URL}/api/shopify/auth/${store.id}`;
+    window.open(installUrl, '_blank');
   };
 
   const generateTrackingNumber = (country) => {
@@ -333,9 +336,7 @@ function App() {
         const data = await response.json();
         alert('Failed to create shipment: ' + data.message);
       }
-    } catch (error) {
-      alert('Failed to create shipment: ' + error.message);
-    }
+    } catch (error) { alert('Failed to create shipment: ' + error.message); }
     setLoading(false);
   };
 
@@ -348,13 +349,12 @@ function App() {
 
   const handleStoreFilterChange = (storeDomain) => {
     setSelectedStore(storeDomain);
-    if (dashboardTab === 'pending') {
-      fetchPendingOrders(storeDomain);
-    }
-    if (dashboardTab === 'fulfilled') {
-      fetchFulfilledOrders(storeDomain);
-    }
+    if (dashboardTab === 'pending') fetchPendingOrders(storeDomain);
+    if (dashboardTab === 'fulfilled') fetchFulfilledOrders(storeDomain);
   };
+
+  // Get only connected stores for dropdown
+  const connectedStores = stores.filter(s => s.is_connected);
 
   if (!isLoggedIn) {
     return (
@@ -391,7 +391,7 @@ function App() {
           <li className={currentPage === 'shopify' ? 'active' : ''} onClick={() => navigateTo('shopify')}>🛒 Shopify Settings</li>
         </ul>
         <div className="nav-bottom">
-          <div className="nav-item" onClick={() => navigateTo('api')}>📖 API Guide</div>
+          <div className="nav-item" onClick={() => navigateTo('api')}>📖 Setup Guide</div>
           <div className="user-info">Logged in as <strong>admin</strong><button className="logout-btn" onClick={handleLogout}>Logout</button></div>
         </div>
       </nav>
@@ -414,23 +414,18 @@ function App() {
               <div className="store-filter">
                 <select value={selectedStore} onChange={(e) => handleStoreFilterChange(e.target.value)}>
                   <option value="all">All Stores</option>
-                  {stores.map(store => (<option key={store.id} value={store.domain}>{store.store_name ? `${store.store_name}` : store.domain}</option>))}
+                  {connectedStores.map(store => (
+                    <option key={store.id} value={store.domain}>
+                      {store.store_name || store.domain}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Søgefelt ved siden af dropdown */}
               {(dashboardTab === 'fulfilled' || dashboardTab === 'recent') && (
                 <div className="search-bar-inline">
-                  <input 
-                    type="text" 
-                    placeholder="Search..." 
-                    value={searchQuery} 
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="search-input-inline"
-                  />
-                  {searchQuery && (
-                    <button className="search-clear-inline" onClick={() => setSearchQuery('')}>✕</button>
-                  )}
+                  <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="search-input-inline" />
+                  {searchQuery && <button className="search-clear-inline" onClick={() => setSearchQuery('')}>✕</button>}
                 </div>
               )}
               
@@ -515,11 +510,10 @@ function App() {
         {currentPage === 'shopify' && (
           <div className="shopify-settings">
             <h1>Shopify Settings</h1>
-            <p className="description">Connect your Shopify store to Trackisto. Orders will be auto-fulfilled at your specified time.</p>
+            <p className="description">Connect your Shopify stores to Trackisto. Each store needs its own Shopify App with Client ID and Secret.</p>
 
             <div className="url-converter">
-              <p>📋 Need help? <button className="link-btn" onClick={() => alert('1. Go to Shopify Admin\n2. Settings → Apps → Develop apps\n3. Create app with Admin API scopes\n4. Install and copy access token')}>Click here for setup instructions</button></p>
-              <label>Paste Shopify Admin URL (auto-convert)</label>
+              <p>📋 <strong>Quick Tip:</strong> Paste your Shopify Admin URL to auto-fill the domain</p>
               <div className="converter-row">
                 <input type="text" placeholder="https://admin.shopify.com/store/your-store/..." value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} />
                 <button onClick={handleConvertUrl}>Convert</button>
@@ -532,13 +526,40 @@ function App() {
               <div className="store-form-container">
                 <button className="btn-cancel" onClick={() => { setShowAddStore(false); resetStoreForm(); }}>✕ Cancel</button>
                 <form onSubmit={handleAddStore} className="store-form">
+                  <h3 style={{marginBottom: '20px', color: '#2c3e50'}}>{editingStore ? 'Edit Store' : 'Add New Store'}</h3>
+                  
+                  <div style={{background: '#f0f4ff', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #667eea'}}>
+                    <h4 style={{marginBottom: '15px', color: '#667eea'}}>🔑 Shopify App Credentials</h4>
+                    <p style={{fontSize: '14px', color: '#666', marginBottom: '15px'}}>
+                      Get these from: <strong>Shopify Partner Dashboard → Apps → Your App → Client credentials</strong>
+                    </p>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Store Name</label>
+                        <input type="text" placeholder="My Store" value={storeForm.store_name} onChange={(e) => setStoreForm({ ...storeForm, store_name: e.target.value })} />
+                        <small className="field-hint">Display name (shown in dropdown)</small>
+                      </div>
+                      <div className="form-group">
+                        <label>Shopify Domain *</label>
+                        <input type="text" placeholder="your-store.myshopify.com" value={storeForm.domain} onChange={(e) => setStoreForm({ ...storeForm, domain: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Client ID *</label>
+                        <input type="text" placeholder="b9dcbb77774968045304..." value={storeForm.client_id} onChange={(e) => setStoreForm({ ...storeForm, client_id: e.target.value })} />
+                        <small className="field-hint">From Shopify App → Client credentials</small>
+                      </div>
+                      <div className="form-group">
+                        <label>Client Secret *</label>
+                        <input type="password" placeholder="shpss_..." value={storeForm.client_secret} onChange={(e) => setStoreForm({ ...storeForm, client_secret: e.target.value })} />
+                        <small className="field-hint">From Shopify App → Client credentials</small>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="form-grid">
-                    <div className="form-group"><label>Store Name</label><input type="text" placeholder="My Store" value={storeForm.store_name} onChange={(e) => setStoreForm({ ...storeForm, store_name: e.target.value })} /><small className="field-hint">Display name for this store (shown in dropdown)</small></div>
-                    <div className="form-group"><label>Shopify Domain</label><input type="text" placeholder="your-store.myshopify.com" value={storeForm.domain} onChange={(e) => setStoreForm({ ...storeForm, domain: e.target.value })} required /></div>
-                    <div className="form-group"><label>Admin API Token</label><input type="text" placeholder={editingStore ? "(unchanged if empty)" : "shpat_..."} value={storeForm.api_token} onChange={(e) => setStoreForm({ ...storeForm, api_token: e.target.value })} required={!editingStore} />{editingStore && <small className="field-hint">Leave empty to keep existing token</small>}</div>
                     <div className="form-group"><label>Delivery Days</label><input type="number" value={storeForm.delivery_days} onChange={(e) => setStoreForm({ ...storeForm, delivery_days: parseInt(e.target.value) })} min="1" required /></div>
                     <div className="form-group"><label>Send Offset (Days)</label><input type="number" value={storeForm.send_offset} onChange={(e) => setStoreForm({ ...storeForm, send_offset: parseInt(e.target.value) })} min="0" /></div>
-                    <div className="form-group"><label>Fulfillment Time</label><select value={storeForm.fulfillment_time} onChange={(e) => setStoreForm({ ...storeForm, fulfillment_time: e.target.value })}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select><small className="field-hint">Orders fulfilled at this time daily (Danish time)</small></div>
+                    <div className="form-group"><label>Fulfillment Time</label><select value={storeForm.fulfillment_time} onChange={(e) => setStoreForm({ ...storeForm, fulfillment_time: e.target.value })}>{timeOptions.map(t => <option key={t} value={t}>{t}</option>)}</select><small className="field-hint">Daily fulfillment time (Danish time)</small></div>
                     <div className="form-group"><label>Country of Origin</label><select value={storeForm.country_origin} onChange={(e) => setStoreForm({ ...storeForm, country_origin: e.target.value })} required><option value="">Select...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                     <div className="form-group"><label>Transit Country</label><select value={storeForm.transit_country} onChange={(e) => setStoreForm({ ...storeForm, transit_country: e.target.value })}><option value="">Select...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                     <div className="form-group"><label>Post Delivery Event</label><select value={storeForm.post_delivery_event} onChange={(e) => setStoreForm({ ...storeForm, post_delivery_event: e.target.value })}>{postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -556,19 +577,40 @@ function App() {
 
             <div className="stores-table">
               <h2>Connected Stores</h2>
-              {stores.length === 0 ? <p className="no-stores">No stores connected yet.</p> : (
+              {stores.length === 0 ? <p className="no-stores">No stores added yet. Click "+ Add Shopify Store" to get started.</p> : (
                 <table>
-                  <thead><tr><th>Status</th><th>Store Name</th><th>Domain</th><th>Days</th><th>Fulfill Time</th><th>Origin</th><th>Actions</th></tr></thead>
+                  <thead><tr><th>Status</th><th>Store Name</th><th>Domain</th><th>Connection</th><th>Days</th><th>Fulfill Time</th><th>Actions</th></tr></thead>
                   <tbody>
                     {stores.map(store => (
                       <tr key={store.id}>
-                        <td><span className={`status-indicator ${store.status === 'active' ? 'active' : 'inactive'}`} onClick={() => toggleStoreStatus(store)}>{store.status === 'active' ? '✓' : '✕'}</span></td>
+                        <td>
+                          <span 
+                            className={`status-indicator ${store.status === 'active' ? 'active' : 'inactive'}`} 
+                            onClick={() => toggleStoreStatus(store)}
+                            title={store.status === 'active' ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
+                          >
+                            {store.status === 'active' ? '✓' : '✕'}
+                          </span>
+                        </td>
                         <td>{store.store_name || '-'}</td>
                         <td>{store.domain}</td>
+                        <td>
+                          {store.is_connected ? (
+                            <span className="connection-status connected">✓ Connected</span>
+                          ) : store.has_credentials ? (
+                            <button className="btn-connect" onClick={() => handleConnectToShopify(store)}>
+                              🔗 Connect to Shopify
+                            </button>
+                          ) : (
+                            <span className="connection-status not-configured">⚠️ Need credentials</span>
+                          )}
+                        </td>
                         <td>{store.delivery_days}</td>
-                        <td>{store.fulfillment_time || '10:00'}</td>
-                        <td>{store.country_origin}</td>
-                        <td><button className="btn-edit" onClick={() => handleEditStore(store)}>Edit</button><button className="btn-delete" onClick={() => handleDeleteStore(store.id)}>Del</button></td>
+                        <td>{store.fulfillment_time || '16:00'}</td>
+                        <td>
+                          <button className="btn-edit" onClick={() => handleEditStore(store)}>Edit</button>
+                          <button className="btn-delete" onClick={() => handleDeleteStore(store.id)}>Del</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -618,22 +660,22 @@ function App() {
                 <div className="form-section">
                   <h3 className="section-title">Delivery Info</h3>
                   <div className="form-row">
-                    <div className="form-group"><label>Destination Country <span className="hint">(Customer's country)</span></label><select value={manualForm.country} onChange={(e) => setManualForm({...manualForm, country: e.target.value})} required><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                    <div className="form-group"><label>Delivery Days <span className="hint">(Estimated transit time)</span></label><input type="number" value={manualForm.delivery_days} onChange={(e) => setManualForm({...manualForm, delivery_days: parseInt(e.target.value)})} min="1" /></div>
+                    <div className="form-group"><label>Destination Country</label><select value={manualForm.country} onChange={(e) => setManualForm({...manualForm, country: e.target.value})} required><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Delivery Days</label><input type="number" value={manualForm.delivery_days} onChange={(e) => setManualForm({...manualForm, delivery_days: parseInt(e.target.value)})} min="1" /></div>
                   </div>
                   <div className="form-row">
-                    <div className="form-group"><label>Country of Origin <span className="hint">(Where parcel ships from)</span></label><select value={manualForm.country_origin} onChange={(e) => setManualForm({...manualForm, country_origin: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                    <div className="form-group"><label>Transit Country <span className="hint">(Optional stopover country)</span></label><select value={manualForm.transit_country} onChange={(e) => setManualForm({...manualForm, transit_country: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Country of Origin</label><select value={manualForm.country_origin} onChange={(e) => setManualForm({...manualForm, country_origin: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="form-group"><label>Transit Country</label><select value={manualForm.transit_country} onChange={(e) => setManualForm({...manualForm, transit_country: e.target.value})}><option value="">Select Country...</option>{countries.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                   </div>
-                  <div className="form-group" style={{maxWidth: '250px'}}><label>Sorting Days <span className="hint">(Days at sorting facility)</span></label><input type="number" value={manualForm.sorting_days} onChange={(e) => setManualForm({...manualForm, sorting_days: parseInt(e.target.value)})} min="0" /></div>
+                  <div className="form-group" style={{maxWidth: '250px'}}><label>Sorting Days</label><input type="number" value={manualForm.sorting_days} onChange={(e) => setManualForm({...manualForm, sorting_days: parseInt(e.target.value)})} min="0" /></div>
                 </div>
 
                 <div className="form-section">
                   <h3 className="section-title">Post Delivery Settings</h3>
-                  <div className="form-group" style={{maxWidth: '250px'}}><label>Post Delivery Event <span className="hint">(What happens after failed delivery)</span></label><select value={manualForm.post_delivery_event} onChange={(e) => setManualForm({...manualForm, post_delivery_event: e.target.value})}>{postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                  <div className="form-group" style={{maxWidth: '250px'}}><label>Post Delivery Event</label><select value={manualForm.post_delivery_event} onChange={(e) => setManualForm({...manualForm, post_delivery_event: e.target.value})}>{postDeliveryEvents.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
                   <div className="form-row">
-                    <div className="form-group"><label>Redelivery Days <span className="hint">(Days before redelivery attempt)</span></label><input type="number" value={manualForm.redelivery_days} onChange={(e) => setManualForm({...manualForm, redelivery_days: parseInt(e.target.value)})} min="0" /></div>
-                    <div className="form-group"><label>Attempts <span className="hint">(Max delivery attempts)</span></label><input type="number" value={manualForm.attempts} onChange={(e) => setManualForm({...manualForm, attempts: parseInt(e.target.value)})} min="1" /></div>
+                    <div className="form-group"><label>Redelivery Days</label><input type="number" value={manualForm.redelivery_days} onChange={(e) => setManualForm({...manualForm, redelivery_days: parseInt(e.target.value)})} min="0" /></div>
+                    <div className="form-group"><label>Attempts</label><input type="number" value={manualForm.attempts} onChange={(e) => setManualForm({...manualForm, attempts: parseInt(e.target.value)})} min="1" /></div>
                   </div>
                 </div>
 
@@ -653,17 +695,57 @@ function App() {
 
         {currentPage === 'api' && (
           <div className="api-guide">
-            <h1>How to Create a Shopify API Token</h1>
-            <p>Follow these 7 steps to generate your Shopify Admin API token and connect your store to Trackisto.</p>
-            <h3>Step 1: Open App Development</h3><p>Go to admin.shopify.com and login, then search for <strong>App development</strong> in your Shopify Admin settings, and click it.</p>
-            <h3>Step 2: Click "Create an App"</h3><p>Once inside App Development, click the <strong>Create an app</strong> button.</p>
-            <h3>Step 3: Name the App</h3><p>Give your app a name like "tracking" and proceed.</p>
-            <h3>Step 4: Go to Admin API Configuration</h3><p>Click <strong>Configure Admin API scopes</strong> to begin selecting access permissions.</p>
-            <h3>Step 5: Select Required API Scopes</h3><p>Enable all of the following Admin API scopes:</p>
-            <ul><li>read_orders</li><li>write_orders</li><li>read_fulfillments</li><li>write_fulfillments</li><li>read_products</li><li>read_locations</li><li>write_assigned_fulfillment_orders</li><li>read_assigned_fulfillment_orders</li><li>read_merchant_managed_fulfillment_orders</li><li>write_merchant_managed_fulfillment_orders</li></ul>
-            <h3>Step 6: Install the App</h3><p>Click <strong>Install app</strong> to finalize and authorize your custom app.</p>
-            <h3>Step 7: Copy the Admin API Token</h3><p>Reveal and copy your <strong>Admin API token</strong> (you can only view it once!). Paste this token into the Trackisto Shopify Settings page.</p>
-            <div className="warning-box">⚠️ This token is sensitive. Only reveal and use it securely inside your Trackisto admin panel.</div>
+            <h1>🔧 Multi-Store Setup Guide</h1>
+            <p>Follow these steps to connect multiple Shopify stores to Trackisto.</p>
+            
+            <h3>Step 1: Create a Shopify App</h3>
+            <p>For <strong>each store</strong> you want to connect, create a Shopify App:</p>
+            <ol>
+              <li>Go to <a href="https://partners.shopify.com" target="_blank" rel="noopener noreferrer">partners.shopify.com</a></li>
+              <li>Click <strong>Apps</strong> → <strong>Create app</strong> → <strong>Create app manually</strong></li>
+              <li>Name it (e.g., "Trackisto - Store Name")</li>
+            </ol>
+
+            <h3>Step 2: Configure App URLs</h3>
+            <p>In <strong>Configuration</strong>:</p>
+            <ul>
+              <li><strong>App URL:</strong> <code>https://trackisto-backend.onrender.com</code></li>
+              <li><strong>Redirect URL:</strong> <code>https://trackisto-backend.onrender.com/api/shopify/callback</code></li>
+              <li><strong>Embed in admin:</strong> ❌ OFF</li>
+            </ul>
+
+            <h3>Step 3: Add Access Scopes</h3>
+            <p>Copy this into the Scopes field:</p>
+            <div style={{background: '#f0f0f0', padding: '10px', borderRadius: '5px', fontFamily: 'monospace', fontSize: '11px', overflowX: 'auto', marginBottom: '15px'}}>
+              read_orders,write_orders,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_products,read_locations
+            </div>
+
+            <h3>Step 4: Release & Get Credentials</h3>
+            <ol>
+              <li>Click <strong>Release</strong></li>
+              <li>Go to <strong>Client credentials</strong></li>
+              <li>Copy <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+            </ol>
+
+            <h3>Step 5: Add Store in Trackisto</h3>
+            <ol>
+              <li>Go to <strong>Shopify Settings</strong></li>
+              <li>Click <strong>+ Add Shopify Store</strong></li>
+              <li>Enter domain, Client ID, Client Secret</li>
+              <li>Click <strong>Add Store</strong></li>
+            </ol>
+
+            <h3>Step 6: Connect to Shopify</h3>
+            <ol>
+              <li>Find your store in the list</li>
+              <li>Click <strong>🔗 Connect to Shopify</strong></li>
+              <li>Authorize the app in the popup</li>
+              <li>Store shows "✓ Connected" when done!</li>
+            </ol>
+
+            <div className="warning-box">
+              <strong>⚠️ Important:</strong> Each Shopify store needs its own app with unique credentials. You can connect unlimited stores!
+            </div>
           </div>
         )}
       </main>
