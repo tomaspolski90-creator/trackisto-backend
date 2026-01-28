@@ -343,6 +343,8 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
 // ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[WooCommerce Fetch-Fulfill] Starting...');
+  const { orderIds } = req.body; // Optional: specific order IDs to fulfill
+  
   try {
     const storesResult = await db.query(
       "SELECT * FROM shopify_stores WHERE status = $1 AND store_type = 'woocommerce' AND is_connected = true",
@@ -354,8 +356,14 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
     
     for (const store of storesResult.rows) {
       console.log(`[WooCommerce Fetch-Fulfill] Processing store: ${store.domain}`);
-      const orders = await fetchWooCommerceOrders(store, 'processing');
-      console.log(`[WooCommerce Fetch-Fulfill] Found ${orders.length} pending orders`);
+      const allOrders = await fetchWooCommerceOrders(store, 'processing');
+      
+      // Filter to specific orders if orderIds provided
+      const orders = orderIds && orderIds.length > 0
+        ? allOrders.filter(o => orderIds.includes(o.id))
+        : allOrders;
+      
+      console.log(`[WooCommerce Fetch-Fulfill] Found ${orders.length} orders to process`);
       
       for (const order of orders) {
         const existing = await db.query(
