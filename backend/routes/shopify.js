@@ -153,7 +153,7 @@ router.get('/callback', async (req, res) => {
 // STORE MANAGEMENT
 // ============================================
 
-// Get all stores (inkluderer is_connected og has_credentials)
+// Get all stores (inkluderer is_connected og has_credentials) - KUN SHOPIFY
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
@@ -167,6 +167,7 @@ router.get('/stores', authMiddleware, async (req, res) => {
         (client_id IS NOT NULL AND client_id != '' AND client_secret IS NOT NULL AND client_secret != '') as has_credentials,
         (api_token IS NOT NULL AND api_token != '') as has_token
       FROM shopify_stores 
+      WHERE (store_type = 'shopify' OR store_type IS NULL)
       ORDER BY created_at DESC
     `);
     res.json({ stores: result.rows });
@@ -176,7 +177,7 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new store (nu med client_id og client_secret)
+// Add new store (nu med client_id og client_secret) - SHOPIFY TYPE
 router.post('/stores', authMiddleware, async (req, res) => {
   try {
     const { 
@@ -200,13 +201,13 @@ router.post('/stores', authMiddleware, async (req, res) => {
     
     const result = await db.query(`
       INSERT INTO shopify_stores (
-        store_name, domain, client_id, client_secret,
+        store_name, domain, client_id, client_secret, store_type,
         delivery_days, send_offset, fulfillment_time,
         country_origin, transit_country, sorting_days, 
         parcel_point, parcel_point_days,
         redelivery_active, redelivery_days, attempts, 
         post_delivery_event, status, is_connected, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'inactive', false, NOW())
+      ) VALUES ($1, $2, $3, $4, 'shopify', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'inactive', false, NOW())
       RETURNING id
     `, [
       store_name, domain, client_id, client_secret,
@@ -330,19 +331,19 @@ router.delete('/stores/:id', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// PENDING ORDERS (KUN UNFULFILLED)
+// PENDING ORDERS (KUN UNFULFILLED) - KUN SHOPIFY STORES
 // ============================================
 router.get('/pending-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Pending Orders] Fetching unfulfilled orders...');
     
-    // Kun hent fra CONNECTED og ACTIVE stores
+    // Kun hent fra CONNECTED og ACTIVE SHOPIFY stores
     const storesResult = await db.query(
-      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
     );
     const stores = storesResult.rows;
-    console.log(`[Pending Orders] Found ${stores.length} connected stores`);
+    console.log(`[Pending Orders] Found ${stores.length} connected Shopify stores`);
     
     let allOrders = [];
 
@@ -387,13 +388,13 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// FULFILLED ORDERS
+// FULFILLED ORDERS - KUN SHOPIFY STORES
 // ============================================
 router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Fulfilled Orders] Fetching fulfilled orders from Shopify...');
     const storesResult = await db.query(
-      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
     );
     const stores = storesResult.rows;
@@ -440,14 +441,14 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// MANUEL FULFILL
+// MANUEL FULFILL - KUN SHOPIFY STORES
 // ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[Fetch-Fulfill] Manual trigger started...');
   try {
-    // Kun fra CONNECTED stores
+    // Kun fra CONNECTED SHOPIFY stores
     const storesResult = await db.query(
-      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
     );
     let fulfilledCount = 0;
@@ -732,7 +733,7 @@ async function processAutoFulfillment() {
 
   try {
     const storesResult = await db.query(
-      'SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL',
+      "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
     );
     
