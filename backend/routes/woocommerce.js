@@ -44,13 +44,28 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 200)}`);
+      console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 500)}`);
       return [];
     }
     
-    const orders = await response.json();
-    console.log(`[WooCommerce] Found ${orders.length} orders with status ${status}`);
-    return orders;
+    const responseText = await response.text();
+    
+    // Check if response is HTML instead of JSON
+    if (responseText.trim().startsWith('<')) {
+      console.error(`[WooCommerce] Received HTML instead of JSON from ${store.domain}`);
+      console.error(`[WooCommerce] HTML content: ${responseText.substring(0, 500)}`);
+      return [];
+    }
+    
+    try {
+      const orders = JSON.parse(responseText);
+      console.log(`[WooCommerce] Found ${orders.length} orders with status ${status}`);
+      return orders;
+    } catch (parseError) {
+      console.error(`[WooCommerce] JSON parse error: ${parseError.message}`);
+      console.error(`[WooCommerce] Response content: ${responseText.substring(0, 500)}`);
+      return [];
+    }
   } catch (error) {
     console.error(`[WooCommerce] Error fetching orders from ${store.domain}:`, error.message);
     return [];
