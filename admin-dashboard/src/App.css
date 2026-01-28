@@ -269,5 +269,52 @@ td { font-size: 0.9rem; color: #2c3e50; }
   color: #5e35b1;
 }
 
+/* Checkbox selection styles */
+.checkbox-col {
+  width: 40px;
+  text-align: center;
+}
+
+.checkbox-col input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #3498db;
+}
+
+.selected-row {
+  background: #e3f2fd !important;
+}
+
+.selected-row:hover {
+  background: #bbdefb !important;
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.btn-clear-selection {
+  padding: 5px 12px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-clear-selection:hover {
+  background: #c0392b;
+}
+
 @media (max-width: 1200px) { .form-grid { grid-template-columns: 1fr; } .stores-table { overflow-x: auto; } }
 @media (max-width: 768px) { .app { flex-direction: column; } .sidebar { width: 100%; } .stats-grid { grid-template-columns: 1fr; } .form-row, .form-row.three-col { grid-template-columns: 1fr; } .dashboard-tabs { flex-wrap: wrap; } .fetch-btn { margin-left: 0; width: 100%; justify-content: center; } .refresh-btn { margin-left: 0; width: 100%; } .search-bar { max-width: 100%; } }
