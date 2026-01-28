@@ -13,8 +13,13 @@ const authMiddleware = (req, res, next) => {
 // ============================================
 
 function buildWooCommerceUrl(store, endpoint) {
-  const baseUrl = store.domain.startsWith('http') ? store.domain : `https://${store.domain}`;
-  const url = new URL(`/wp-json/wc/v3/${endpoint}`, baseUrl);
+  // Clean the domain - remove any protocol and trailing slashes
+  let domain = store.domain
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+  
+  const baseUrl = `https://${domain}/wp-json/wc/v3/${endpoint}`;
+  const url = new URL(baseUrl);
   url.searchParams.append('consumer_key', store.client_id);
   url.searchParams.append('consumer_secret', store.client_secret);
   return url.toString();
@@ -26,6 +31,7 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
     const fullUrl = `${url}&status=${status}&per_page=50`;
     
     console.log(`[WooCommerce] Fetching orders from ${store.domain} with status: ${status}`);
+    console.log(`[WooCommerce] Full URL: ${fullUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***')}`);
     
     const response = await fetch(fullUrl, {
       method: 'GET',
@@ -34,7 +40,7 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText}`);
+      console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 200)}`);
       return [];
     }
     
@@ -115,7 +121,7 @@ router.get('/stores', authMiddleware, async (req, res) => {
 
 router.post('/stores', authMiddleware, async (req, res) => {
   try {
-    const { 
+    let { 
       store_name, domain, client_id, client_secret,
       delivery_days = 7, send_offset = 0, fulfillment_time = '16:00',
       country_origin = 'United Kingdom', transit_country = '',
@@ -127,6 +133,9 @@ router.post('/stores', authMiddleware, async (req, res) => {
     if (!domain) {
       return res.status(400).json({ error: 'Domain is required' });
     }
+    
+    // Clean the domain
+    domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     
     const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [domain]);
     if (existingStore.rows.length > 0) {
@@ -172,7 +181,7 @@ router.post('/stores', authMiddleware, async (req, res) => {
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
+    let { 
       store_name, domain, client_id, client_secret,
       delivery_days, send_offset, fulfillment_time, 
       country_origin, transit_country, sorting_days, 
@@ -183,6 +192,11 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
     const existing = await db.query('SELECT * FROM shopify_stores WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Store not found' });
+    }
+    
+    // Clean the domain if provided
+    if (domain) {
+      domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     }
     
     let updateFields = [];
@@ -405,11 +419,14 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
 // Test connection
 router.post('/test-connection', authMiddleware, async (req, res) => {
   try {
-    const { domain, client_id, client_secret } = req.body;
+    let { domain, client_id, client_secret } = req.body;
     
     if (!domain || !client_id || !client_secret) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    
+    // Clean the domain
+    domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     
     const store = { domain, client_id, client_secret };
     const url = buildWooCommerceUrl(store, 'system_status');
