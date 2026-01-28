@@ -445,6 +445,8 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
 // ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[Fetch-Fulfill] Manual trigger started...');
+  const { orderIds } = req.body; // Optional: specific order IDs to fulfill
+  
   try {
     // Kun fra CONNECTED SHOPIFY stores
     const storesResult = await db.query(
@@ -456,8 +458,14 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
 
     for (const store of storesResult.rows) {
       console.log(`[Fetch-Fulfill] Processing store: ${store.domain}`);
-      const orders = await fetchUnfulfilledOrders(store);
-      console.log(`[Fetch-Fulfill] Found ${orders.length} unfulfilled orders`);
+      const allOrders = await fetchUnfulfilledOrders(store);
+      
+      // Filter to specific orders if orderIds provided
+      const orders = orderIds && orderIds.length > 0
+        ? allOrders.filter(o => orderIds.includes(o.id))
+        : allOrders;
+      
+      console.log(`[Fetch-Fulfill] Found ${orders.length} orders to process`);
 
       for (const order of orders) {
         if (!order.shipping_address) {
