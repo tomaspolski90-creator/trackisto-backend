@@ -165,27 +165,109 @@ td { font-size: 0.9rem; color: #2c3e50; }
 .search-clear-inline { position: absolute; right: 10px; background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px; }
 .search-clear-inline:hover { color: #666; }
 
-.connection-status { padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; display: inline-block; }
-.connection-status.connected { background: #d4edda; color: #155724; }
-.connection-status.not-configured { background: #fff3cd; color: #856404; }
+/* Connection Status (Multi-Store) */
+.connection-status { 
+  padding: 4px 10px; 
+  border-radius: 4px; 
+  font-size: 0.8rem; 
+  font-weight: 500; 
+  display: inline-block;
+}
 
-.btn-connect { padding: 6px 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: transform 0.2s, box-shadow 0.2s; }
-.btn-connect:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
-.btn-connect:active { transform: translateY(0); }
+.connection-status.connected { 
+  background: #d4edda; 
+  color: #155724; 
+}
+
+.connection-status.not-configured { 
+  background: #fff3cd; 
+  color: #856404; 
+}
+
+/* Connect to Shopify Button */
+.btn-connect { 
+  padding: 6px 14px; 
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+  color: white; 
+  border: none; 
+  border-radius: 4px; 
+  cursor: pointer; 
+  font-size: 0.8rem; 
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-connect:hover { 
+  transform: translateY(-1px); 
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); 
+}
+
+.btn-connect:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+   WOOCOMMERCE STYLING
+   ============================================ */
 
 /* WooCommerce Add Store Button (lilla) */
-.btn-add-woo-store { width: 100%; padding: 15px; background: #7f54b3; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; margin-bottom: 25px; transition: background 0.2s; }
-.btn-add-woo-store:hover { background: #6b4799; }
+.btn-add-woo-store {
+  width: 100%;
+  padding: 15px;
+  background: #7f54b3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 25px;
+  transition: background 0.2s;
+}
+
+.btn-add-woo-store:hover {
+  background: #6b4799;
+}
 
 /* WooCommerce Submit Button (lilla) */
-.btn-submit-woo { width: 100%; padding: 15px; background: #7f54b3; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
-.btn-submit-woo:hover { background: #6b4799; }
-.btn-submit-woo:disabled { background: #95a5a6; cursor: not-allowed; }
+.btn-submit-woo {
+  width: 100%;
+  padding: 15px;
+  background: #7f54b3;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-submit-woo:hover {
+  background: #6b4799;
+}
+
+.btn-submit-woo:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
 
 /* Store Badge in Pending Orders */
-.store-badge { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
-.store-badge.shopify { background: #e8f5e9; color: #2e7d32; }
-.store-badge.woocommerce { background: #ede7f6; color: #5e35b1; }
+.store-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.store-badge.shopify {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.store-badge.woocommerce {
+  background: #ede7f6;
+  color: #5e35b1;
+}
 
 @media (max-width: 1200px) { .form-grid { grid-template-columns: 1fr; } .stores-table { overflow-x: auto; } }
 @media (max-width: 768px) { .app { flex-direction: column; } .sidebar { width: 100%; } .stats-grid { grid-template-columns: 1fr; } .form-row, .form-row.three-col { grid-template-columns: 1fr; } .dashboard-tabs { flex-wrap: wrap; } .fetch-btn { margin-left: 0; width: 100%; justify-content: center; } .refresh-btn { margin-left: 0; width: 100%; } .search-bar { max-width: 100%; } }
