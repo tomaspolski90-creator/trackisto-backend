@@ -14,12 +14,14 @@ const shipmentRoutes = require('./routes/shipments');
 const trackingRoutes = require('./routes/tracking');
 const shopifyRoutes = require('./routes/shopify');
 const contactRoutes = require('./routes/contact');
+const woocommerceRoutes = require('./routes/woocommerce');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/shopify', shopifyRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/woocommerce', woocommerceRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
