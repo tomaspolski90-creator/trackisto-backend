@@ -52,6 +52,7 @@ function App() {
     post_delivery_event: 'Redelivery', redelivery_days: 3, attempts: 1
   });
   const [generatedTracking, setGeneratedTracking] = useState(null);
+  const [selectedOrders, setSelectedOrders] = useState([]);
 
   const navigateTo = (page) => {
     setCurrentPage(page);
@@ -135,38 +136,92 @@ function App() {
   };
 
   const fetchAndFulfillOrders = async () => {
-    if (!window.confirm('This will fulfill ALL pending orders and send tracking emails to customers. Continue?')) return;
+    const ordersToFulfill = selectedOrders.length > 0 ? selectedOrders : filteredPendingOrders;
+    const orderCount = ordersToFulfill.length;
+    
+    if (orderCount === 0) {
+      alert('No orders selected. Please select orders to fulfill.');
+      return;
+    }
+    
+    const confirmMsg = selectedOrders.length > 0 
+      ? `This will fulfill ${orderCount} selected order(s) and send tracking emails. Continue?`
+      : `This will fulfill ALL ${orderCount} pending order(s) and send tracking emails. Continue?`;
+    
+    if (!window.confirm(confirmMsg)) return;
     setPendingLoading(true);
+    
     try {
-      // Fulfill from both Shopify and WooCommerce
-      const [shopifyRes, wooRes] = await Promise.all([
-        fetch(`${API_URL}/api/shopify/fetch-and-fulfill`, {
-          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${API_URL}/api/woocommerce/fetch-and-fulfill`, {
-          method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      // Group orders by store type
+      const shopifyOrders = ordersToFulfill.filter(o => o.store_type === 'shopify');
+      const wooOrders = ordersToFulfill.filter(o => o.store_type === 'woocommerce');
       
       let totalFulfilled = 0;
       let messages = [];
       
-      if (shopifyRes.ok) {
-        const data = await shopifyRes.json();
-        totalFulfilled += data.fulfilled || 0;
-        if (data.fulfilled > 0) messages.push(`Shopify: ${data.fulfilled}`);
+      // Fulfill Shopify orders
+      if (shopifyOrders.length > 0) {
+        const shopifyRes = await fetch(`${API_URL}/api/shopify/fetch-and-fulfill`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ orderIds: shopifyOrders.map(o => o.id) })
+        });
+        if (shopifyRes.ok) {
+          const data = await shopifyRes.json();
+          totalFulfilled += data.fulfilled || 0;
+          if (data.fulfilled > 0) messages.push(`Shopify: ${data.fulfilled}`);
+        }
       }
-      if (wooRes.ok) {
-        const data = await wooRes.json();
-        totalFulfilled += data.fulfilled || 0;
-        if (data.fulfilled > 0) messages.push(`WooCommerce: ${data.fulfilled}`);
+      
+      // Fulfill WooCommerce orders
+      if (wooOrders.length > 0) {
+        const wooRes = await fetch(`${API_URL}/api/woocommerce/fetch-and-fulfill`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ orderIds: wooOrders.map(o => o.id) })
+        });
+        if (wooRes.ok) {
+          const data = await wooRes.json();
+          totalFulfilled += data.fulfilled || 0;
+          if (data.fulfilled > 0) messages.push(`WooCommerce: ${data.fulfilled}`);
+        }
       }
       
       alert(`✅ Fulfilled ${totalFulfilled} orders${messages.length > 0 ? ' (' + messages.join(', ') + ')' : ''}`);
+      setSelectedOrders([]);
       fetchDashboardData();
       fetchPendingOrders();
     } catch (error) { alert('Error: ' + error.message); }
     setPendingLoading(false);
+  };
+
+  const toggleOrderSelection = (order) => {
+    const orderKey = `${order.store_type}-${order.id}`;
+    setSelectedOrders(prev => {
+      if (prev.find(o => `${o.store_type}-${o.id}` === orderKey)) {
+        return prev.filter(o => `${o.store_type}-${o.id}` !== orderKey);
+      } else {
+        return [...prev, order];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrders.length === filteredPendingOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders([...filteredPendingOrders]);
+    }
+  };
+
+  const isOrderSelected = (order) => {
+    return selectedOrders.some(o => `${o.store_type}-${o.id}` === `${order.store_type}-${order.id}`);
   };
 
   const filteredPendingOrders = selectedStore === 'all' 
@@ -540,11 +595,11 @@ function App() {
                 </div>
               )}
               
-              <button className="refresh-btn" onClick={() => { fetchPendingOrders(); fetchFulfilledOrders(); }} disabled={pendingLoading}>🔄 Refresh</button>
+              <button className="refresh-btn" onClick={() => { fetchPendingOrders(); fetchFulfilledOrders(); setSelectedOrders([]); }} disabled={pendingLoading}>🔄 Refresh</button>
               {dashboardTab === 'pending' && (
                 <button className="fetch-btn" onClick={fetchAndFulfillOrders} disabled={pendingLoading}>
                   <span className="fetch-icon">⬇</span>
-                  {pendingLoading ? 'Processing...' : 'Fetch Pending Parcels'}
+                  {pendingLoading ? 'Processing...' : selectedOrders.length > 0 ? `Fulfill ${selectedOrders.length} Selected` : 'Fetch All Pending'}
                 </button>
               )}
             </div>
@@ -571,22 +626,51 @@ function App() {
             {dashboardTab === 'pending' && (
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading pending orders...</div>) : (
-                  <table>
-                    <thead><tr><th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>STORE</th><th>ORDER DATE</th></tr></thead>
-                    <tbody>
-                      {filteredPendingOrders.map(order => (
-                        <tr key={`${order.store_type}-${order.id}`}>
-                          <td>#{order.order_number}</td>
-                          <td>{order.customer_name}</td>
-                          <td>{order.country}</td>
-                          <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
-                          <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐 Woo' : '🛒 Shopify'}</span></td>
-                          <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                  <>
+                    {filteredPendingOrders.length > 0 && (
+                      <div className="selection-info">
+                        <span>{selectedOrders.length} of {filteredPendingOrders.length} selected</span>
+                        {selectedOrders.length > 0 && (
+                          <button className="btn-clear-selection" onClick={() => setSelectedOrders([])}>Clear selection</button>
+                        )}
+                      </div>
+                    )}
+                    <table>
+                      <thead>
+                        <tr>
+                          <th className="checkbox-col">
+                            <input 
+                              type="checkbox" 
+                              checked={filteredPendingOrders.length > 0 && selectedOrders.length === filteredPendingOrders.length}
+                              onChange={toggleSelectAll}
+                              title="Select all"
+                            />
+                          </th>
+                          <th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>STORE</th><th>ORDER DATE</th>
                         </tr>
-                      ))}
-                      {filteredPendingOrders.length === 0 && (<tr><td colSpan="6" className="no-data">🎉 No pending orders - all orders are fulfilled!</td></tr>)}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredPendingOrders.map(order => (
+                          <tr key={`${order.store_type}-${order.id}`} className={isOrderSelected(order) ? 'selected-row' : ''}>
+                            <td className="checkbox-col">
+                              <input 
+                                type="checkbox" 
+                                checked={isOrderSelected(order)}
+                                onChange={() => toggleOrderSelection(order)}
+                              />
+                            </td>
+                            <td>#{order.order_number}</td>
+                            <td>{order.customer_name}</td>
+                            <td>{order.country}</td>
+                            <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
+                            <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐 Woo' : '🛒 Shopify'}</span></td>
+                            <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                        {filteredPendingOrders.length === 0 && (<tr><td colSpan="7" className="no-data">🎉 No pending orders - all orders are fulfilled!</td></tr>)}
+                      </tbody>
+                    </table>
+                  </>
                 )}
                 <div className="pending-info"><p>Pending Shipments (Page 1 of 1)</p></div>
               </div>
