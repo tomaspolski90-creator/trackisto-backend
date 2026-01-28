@@ -35,7 +35,11 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
     
     const response = await fetch(fullUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
+        'Accept': 'application/json'
+      }
     });
     
     if (!response.ok) {
@@ -59,7 +63,11 @@ async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUr
     
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         status: 'completed',
         meta_data: [
@@ -78,7 +86,11 @@ async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUr
     const noteUrl = buildWooCommerceUrl(store, `orders/${orderId}/notes`);
     await fetch(noteUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         note: `Order shipped! Tracking number: ${trackingNumber}\nTrack your order: ${trackingUrl}`,
         customer_note: true
@@ -433,7 +445,11 @@ router.post('/test-connection', authMiddleware, async (req, res) => {
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
+        'Accept': 'application/json'
+      }
     });
     
     if (response.ok) {
