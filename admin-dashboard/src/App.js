@@ -73,6 +73,20 @@ function App() {
     if (h < 22) timeOptions.push(`${h.toString().padStart(2, '0')}:30`);
   }
 
+  // Helper function to get store info by ID
+  const getStoreInfo = (storeId) => {
+    const allStores = [...stores, ...wooStores];
+    const store = allStores.find(s => s.id === storeId);
+    if (!store) return { name: 'Manual', type: 'manual' };
+    
+    // Check if it's a WooCommerce store
+    const isWoo = wooStores.some(s => s.id === storeId);
+    return {
+      name: store.store_name || store.domain,
+      type: isWoo ? 'woocommerce' : 'shopify'
+    };
+  };
+
   const fetchDashboardData = useCallback(async () => {
     try {
       const [statsRes, shipmentsRes, storesRes, wooStoresRes] = await Promise.all([
@@ -607,17 +621,27 @@ function App() {
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
                 <table>
-                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
                   <tbody>
-                    {filteredShipments.slice(0, 10).map(s => (
-                      <tr key={s.id}>
-                        <td>{s.tracking_number}</td><td>{s.customer_name}</td><td>{s.country}</td>
-                        <td><span className={`status ${s.status}`}>{s.status}</span></td>
-                        <td>{new Date(s.created_at).toLocaleDateString()}</td>
-                        <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
-                      </tr>
-                    ))}
-                    {filteredShipments.length === 0 && (<tr><td colSpan="6" className="no-data">No shipments found</td></tr>)}
+                    {filteredShipments.slice(0, 10).map(s => {
+                      const storeInfo = getStoreInfo(s.shopify_store_id);
+                      return (
+                        <tr key={s.id}>
+                          <td>{s.tracking_number}</td>
+                          <td>{s.customer_name}</td>
+                          <td>{s.country}</td>
+                          <td>
+                            <span className={`store-badge ${storeInfo.type}`}>
+                              {storeInfo.type === 'woocommerce' ? '🌐 Woo' : storeInfo.type === 'shopify' ? '🛒 Shopify' : '✏️ Manual'}
+                            </span>
+                          </td>
+                          <td><span className={`status ${s.status}`}>{s.status}</span></td>
+                          <td>{new Date(s.created_at).toLocaleDateString()}</td>
+                          <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
+                        </tr>
+                      );
+                    })}
+                    {filteredShipments.length === 0 && (<tr><td colSpan="7" className="no-data">No shipments found</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -680,19 +704,27 @@ function App() {
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading fulfilled orders...</div>) : (
                   <table>
-                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
                     <tbody>
-                      {filteredFulfilledOrders.map(order => (
-                        <tr key={order.id}>
-                          <td>{order.tracking_number || '-'}</td>
-                          <td>{order.customer_name}</td>
-                          <td>{order.country}</td>
-                          <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
-                          <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                          <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
-                        </tr>
-                      ))}
-                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="6" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
+                      {filteredFulfilledOrders.map(order => {
+                        const storeInfo = getStoreInfo(order.shopify_store_id);
+                        return (
+                          <tr key={order.id}>
+                            <td>{order.tracking_number || '-'}</td>
+                            <td>{order.customer_name}</td>
+                            <td>{order.country}</td>
+                            <td>
+                              <span className={`store-badge ${storeInfo.type}`}>
+                                {storeInfo.type === 'woocommerce' ? '🌐 Woo' : storeInfo.type === 'shopify' ? '🛒 Shopify' : '✏️ Manual'}
+                              </span>
+                            </td>
+                            <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
+                            <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                            <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
+                          </tr>
+                        );
+                      })}
+                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="7" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
                     </tbody>
                   </table>
                 )}
