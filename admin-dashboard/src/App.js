@@ -77,13 +77,17 @@ function App() {
   const getStoreInfo = (storeId) => {
     const allStores = [...stores, ...wooStores];
     const store = allStores.find(s => s.id === storeId);
-    if (!store) return { name: 'Manual', type: 'manual' };
+    if (!store) return { name: 'Manual', type: 'manual', displayName: '✏️ Manual' };
     
     // Check if it's a WooCommerce store
     const isWoo = wooStores.some(s => s.id === storeId);
+    const storeName = store.store_name || store.domain;
+    const typeIcon = isWoo ? '🌐' : '🛒';
+    
     return {
-      name: store.store_name || store.domain,
-      type: isWoo ? 'woocommerce' : 'shopify'
+      name: storeName,
+      type: isWoo ? 'woocommerce' : 'shopify',
+      displayName: `${typeIcon} ${storeName}`
     };
   };
 
@@ -118,11 +122,11 @@ function App() {
       let allOrders = [];
       if (shopifyRes.ok) {
         const data = await shopifyRes.json();
-        allOrders = [...allOrders, ...(data.orders || []).map(o => ({...o, store_type: 'shopify'}))];
+        allOrders = [...allOrders, ...(data.orders || []).map(o => ({...o, store_type: 'shopify', store_name: o.store_name || o.store_domain}))];
       }
       if (wooRes.ok) {
         const data = await wooRes.json();
-        allOrders = [...allOrders, ...(data.orders || []).map(o => ({...o, store_type: 'woocommerce'}))];
+        allOrders = [...allOrders, ...(data.orders || []).map(o => ({...o, store_type: 'woocommerce', store_name: o.store_name || o.store_domain}))];
       }
       
       allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -632,7 +636,7 @@ function App() {
                           <td>{s.country}</td>
                           <td>
                             <span className={`store-badge ${storeInfo.type}`}>
-                              {storeInfo.type === 'woocommerce' ? '🌐 Woo' : storeInfo.type === 'shopify' ? '🛒 Shopify' : '✏️ Manual'}
+                              {storeInfo.displayName}
                             </span>
                           </td>
                           <td><span className={`status ${s.status}`}>{s.status}</span></td>
@@ -687,7 +691,7 @@ function App() {
                             <td>{order.customer_name}</td>
                             <td>{order.country}</td>
                             <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
-                            <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐 Woo' : '🛒 Shopify'}</span></td>
+                            <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐' : '🛒'} {order.store_name || order.store_domain}</span></td>
                             <td>{new Date(order.created_at).toLocaleDateString()}</td>
                           </tr>
                         ))}
@@ -715,7 +719,7 @@ function App() {
                             <td>{order.country}</td>
                             <td>
                               <span className={`store-badge ${storeInfo.type}`}>
-                                {storeInfo.type === 'woocommerce' ? '🌐 Woo' : storeInfo.type === 'shopify' ? '🛒 Shopify' : '✏️ Manual'}
+                                {storeInfo.displayName}
                               </span>
                             </td>
                             <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
