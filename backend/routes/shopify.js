@@ -921,12 +921,3 @@ async function processAutoFulfillment() {
 router.processAutoFulfillment = processAutoFulfillment;
 router.updateTrackingEvents = updateTrackingEvents;
 module.exports = router;
-```
-
----
-
-## Hvad blev rettet:
-
-### 1. Korrekt geografisk rækkefølge:
-```
-Germany (Berlin) → Germany (Hamburg Export) → Netherlands (Transit) → UK (Customs + Delivery)
