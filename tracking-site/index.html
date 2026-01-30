@@ -84,7 +84,7 @@
         .progress-title { font-size: 14px; color: #666; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
         .progress-track { display: flex; align-items: flex-start; justify-content: space-between; position: relative; padding: 0 10px; }
         .progress-track::before { content: ''; position: absolute; top: 24px; left: 34px; right: 34px; height: 3px; background: #e0e0e0; z-index: 0; }
-        .progress-fill { position: absolute; top: 24px; left: 34px; height: 3px; background: #29ABE2; z-index: 1; transition: width 1s ease; }
+        .progress-fill { position: absolute; top: 24px; left: 34px; height: 3px; background: #28a745; z-index: 1; transition: width 1s ease; }
         .progress-step { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; flex: 0 0 auto; }
         .progress-dot { width: 48px; height: 48px; min-width: 48px; min-height: 48px; border-radius: 50%; background: white; border: 3px solid #e0e0e0; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; transition: all 0.3s; box-sizing: border-box; }
         .progress-dot svg { width: 22px; height: 22px; fill: #999; flex-shrink: 0; }
@@ -319,15 +319,12 @@
             finally { searchBtn.disabled = false; searchBtn.innerHTML = 'Track <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>'; }
         }
 
-        // Helper function to format time to HH:MM only
         function formatTime(timeString) {
             if (!timeString) return '';
-            // Remove milliseconds if present (e.g., "11:34:39.315886" -> "11:34")
             let formatted = timeString;
             if (formatted.includes('.')) {
                 formatted = formatted.split('.')[0];
             }
-            // Keep only HH:MM (remove seconds)
             if (formatted.length > 5) {
                 formatted = formatted.substring(0, 5);
             }
@@ -395,13 +392,39 @@
         function updateProgress(status) {
             const progressFill = document.getElementById('progressFill');
             const dots = [document.getElementById('dot1'),document.getElementById('dot2'),document.getElementById('dot3'),document.getElementById('dot4')];
-            let progress = 0, activeDots = 0;
-            if (status === 'label_created') { progress = 25; activeDots = 1; }
-            else if (status === 'in_transit') { progress = 50; activeDots = 2; }
-            else if (status === 'out_for_delivery') { progress = 75; activeDots = 3; }
-            else if (status === 'delivered') { progress = 100; activeDots = 4; }
+            let progress = 0, completedDots = 0, activeDot = -1;
+            
+            if (status === 'label_created') { 
+                progress = 8; 
+                completedDots = 1;
+                activeDot = -1;
+            }
+            else if (status === 'in_transit') { 
+                progress = 40; 
+                completedDots = 1;
+                activeDot = 1;
+            }
+            else if (status === 'out_for_delivery') { 
+                progress = 70; 
+                completedDots = 2;
+                activeDot = 2;
+            }
+            else if (status === 'delivered') { 
+                progress = 100; 
+                completedDots = 4;
+                activeDot = -1;
+            }
+            
             setTimeout(() => { progressFill.style.width = progress + '%'; }, 100);
-            dots.forEach((dot, index) => { dot.classList.remove('active', 'completed'); if (index < activeDots - 1) dot.classList.add('completed'); else if (index === activeDots - 1) dot.classList.add('active'); });
+            
+            dots.forEach((dot, index) => { 
+                dot.classList.remove('active', 'completed'); 
+                if (index < completedDots) {
+                    dot.classList.add('completed');
+                } else if (index === activeDot) {
+                    dot.classList.add('active');
+                }
+            });
         }
 
         function copyTrackingNumber() {
