@@ -521,7 +521,7 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
             shipmentResult.rows[0].id,
             'Label Created',
             `${store.country_origin || 'United Kingdom'}, ${store.country_origin || 'United Kingdom'}`,
-            `Label created in ${store.country_origin || 'United Kingdom'}`
+            `Shipment information received. Label created in ${store.country_origin || 'United Kingdom'}.`
           ]);
 
           console.log(`[Fetch-Fulfill] Saved shipment ${trackingNumber}`);
@@ -594,43 +594,128 @@ async function updateShipmentEvents(shipment) {
   );
   const existingStatuses = eventsResult.rows.map(e => e.status);
   
+  // Get store settings (same as before)
   const originCountry = shipment.origin_country || shipment.country_origin || 'United Kingdom';
   const transitCountry = shipment.transit_country || 'Netherlands';
-  const destinationCountry = shipment.destination_country || shipment.country || 'France';
+  const destinationCountry = shipment.destination_country || shipment.country || 'Denmark';
   const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 7;
   const sortingDays = shipment.sorting_days || shipment.store_sorting_days || 3;
   const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
   
-  const transitDay = Math.max(1, Math.floor(sortingDays / 2));
-  const customsDay = Math.floor(deliveryDays / 2);
-  const clearedDay = customsDay + 1;
-  const outForDeliveryDay = deliveryDays - 1;
+  // Get country code
+  const getCountryCode = (country) => {
+    const codes = {
+      'United Kingdom': 'UK', 'Germany': 'DE', 'Denmark': 'DK', 'Netherlands': 'NL',
+      'France': 'FR', 'Sweden': 'SE', 'Norway': 'NO', 'Belgium': 'BE', 'Italy': 'IT',
+      'Spain': 'ES', 'Poland': 'PL', 'Austria': 'AT', 'Switzerland': 'CH'
+    };
+    return codes[country] || country.substring(0, 2).toUpperCase();
+  };
   
+  const originCode = getCountryCode(originCountry);
+  const destCode = getCountryCode(destinationCountry);
+  
+  // Calculate event days spread across delivery period
+  const totalEvents = 18;
+  const dayStep = Math.max(0.5, deliveryDays / totalEvents);
+  
+  // NEW EVENT SCHEDULE based on PDF - 18 tracking events
   const eventSchedule = [
-    { day: 0, status: 'Label Created', location: `${originCountry}, ${originCountry}`, description: `Label created in ${originCountry}` },
-    { day: 1, status: 'Package Received', location: `Export hub, ${originCountry}`, description: `Package processed at export hub, ${originCountry}` },
-    { day: Math.min(2, transitDay + 1), status: 'Departed Facility', location: `${originCountry} Intl Airport`, description: `Departed via ${originCountry} Intl Airport` },
-    { day: transitDay + 2, status: 'In Transit', location: `${transitCountry}`, description: `In transit through ${transitCountry}` },
-    { day: customsDay, status: 'Customs Hold', location: `Customs, ${destinationCountry}`, description: `Customs hold in ${destinationCountry}` },
-    { day: clearedDay, status: 'Cleared Customs', location: `Customs, ${destinationCountry}`, description: `Cleared customs in ${destinationCountry}` },
-    { day: outForDeliveryDay, status: 'Out for Delivery', location: `${shipment.city || 'Local'}, ${destinationCountry}`, description: `Out for delivery in ${shipment.city || 'your area'}` }
+    // Origin country events
+    { day: 0, status: 'Label Created', 
+      location: `${originCountry}`, 
+      description: `Shipment information received. Label created in ${originCountry}.` },
+    
+    { day: Math.floor(dayStep * 1), status: 'Package Received', 
+      location: `Origin Facility, ${originCountry} (${originCode})`, 
+      description: `Parcel received and scanned at origin facility (${originCode}).` },
+    
+    { day: Math.floor(dayStep * 2), status: 'Processed at Origin Hub', 
+      location: `${originCountry} Origin Hub`, 
+      description: `Processed through ${originCountry} Origin Hub (sorting & outbound preparation).` },
+    
+    { day: Math.floor(dayStep * 3), status: 'Departed Origin Facility', 
+      location: `${originCountry} (${originCode}) Origin Hub`, 
+      description: `Departed ${originCountry} (${originCode}) Origin Hub — linehaul to Export Hub.` },
+    
+    { day: Math.floor(dayStep * 4), status: 'In Transit', 
+      location: `${originCountry}`, 
+      description: `In transit by road to Export Hub (${originCode}).` },
+    
+    // Export hub events
+    { day: Math.floor(dayStep * 5), status: 'Arrived at Export Hub', 
+      location: `Export Hub (${originCode})`, 
+      description: `Arrived at Export Hub (${originCode}) — export processing initiated.` },
+    
+    { day: Math.floor(dayStep * 6), status: 'Export Documentation Check', 
+      location: `Export Hub (${originCode})`, 
+      description: `Export documentation verification and security screening completed.` },
+    
+    { day: Math.floor(dayStep * 7), status: 'Departed Export Hub', 
+      location: `Export Hub (${originCode})`, 
+      description: `Departed (${originCode}) — cross-border linehaul to port facility.` },
+    
+    { day: Math.floor(dayStep * 8), status: 'Awaiting Vessel / Linehaul Queue', 
+      location: `Port Facility`, 
+      description: `Awaiting departure slot at port facility (road/ferry routing).` },
+    
+    // Cross-border transit
+    { day: Math.floor(dayStep * 9), status: 'In Transit', 
+      location: `${transitCountry}`, 
+      description: `In transit — cross-channel movement (non-air route).` },
+    
+    // Destination country events
+    { day: Math.floor(dayStep * 10), status: 'Arrived in ' + destinationCountry, 
+      location: `${destinationCountry} Import Facility`, 
+      description: `Arrived at ${destinationCountry} Import Facility — inbound scan completed.` },
+    
+    { day: Math.floor(dayStep * 11), status: 'Customs Hold', 
+      location: `Customs, ${destinationCountry}`, 
+      description: `Held for customs review in ${destinationCountry} (routine clearance).` },
+    
+    { day: Math.floor(dayStep * 12), status: 'Customs Processing', 
+      location: `Customs, ${destinationCountry}`, 
+      description: `Customs processing underway — additional checks may apply.` },
+    
+    { day: Math.floor(dayStep * 13), status: 'Cleared Customs', 
+      location: `Customs, ${destinationCountry}`, 
+      description: `Cleared customs in ${destinationCountry} — released to carrier network.` },
+    
+    { day: Math.floor(dayStep * 14), status: 'Handed to Local Carrier', 
+      location: `${destinationCountry}`, 
+      description: `Handed over to ${destinationCountry} domestic carrier for final-mile delivery.` },
+    
+    { day: Math.floor(dayStep * 15), status: 'In Transit', 
+      location: `${destinationCountry}`, 
+      description: `In transit to destination region sorting facility (${destinationCountry}).` },
+    
+    { day: Math.floor(dayStep * 16), status: 'Arrived at Local Depot', 
+      location: `${shipment.city || 'Local Depot'}, ${destinationCountry}`, 
+      description: `Arrived at local delivery depot — delivery planning in progress.` },
+    
+    { day: Math.floor(dayStep * 17), status: 'Out for Delivery', 
+      location: `${shipment.city || 'Local'}, ${destinationCountry}`, 
+      description: `Out for delivery in destination area (${destinationCountry}).` }
   ];
   
+  // Add parcel point event if enabled
   if (parcelPoint) {
     eventSchedule.push({
-      day: outForDeliveryDay + 1,
+      day: Math.floor(dayStep * 18),
       status: 'Available at Parcel Point',
       location: `Parcel Point, ${shipment.city || destinationCountry}`,
-      description: `Package available for pickup at local parcel point`
+      description: `Package available for pickup at local parcel point.`
     });
   }
   
+  // Process each event
   for (const event of eventSchedule) {
     if (daysSinceCreation >= event.day && !existingStatuses.includes(event.status)) {
       const eventDate = new Date(createdAt);
       eventDate.setDate(eventDate.getDate() + event.day);
       
-      const hour = 8 + Math.floor(Math.random() * 10);
+      // Random time between 6:00 and 20:00
+      const hour = 6 + Math.floor(Math.random() * 14);
       const minute = Math.floor(Math.random() * 60);
       const eventTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       
@@ -641,9 +726,22 @@ async function updateShipmentEvents(shipment) {
       
       console.log(`[Auto-Events] Added "${event.status}" for shipment ${shipment.tracking_number}`);
       
+      // Update shipment status based on event
       let newStatus = 'label_created';
-      if (['Departed Facility', 'In Transit', 'Customs Hold', 'Cleared Customs'].includes(event.status)) newStatus = 'in_transit';
-      else if (['Out for Delivery', 'Available at Parcel Point'].includes(event.status)) newStatus = 'out_for_delivery';
+      if (['Package Received', 'Processed at Origin Hub'].includes(event.status)) {
+        newStatus = 'processing';
+      } else if (['Departed Origin Facility', 'In Transit', 'Arrived at Export Hub', 
+                  'Export Documentation Check', 'Departed Export Hub', 'Awaiting Vessel / Linehaul Queue'].includes(event.status)) {
+        newStatus = 'in_transit';
+      } else if (event.status.startsWith('Arrived in ')) {
+        newStatus = 'in_transit';
+      } else if (['Customs Hold', 'Customs Processing', 'Cleared Customs'].includes(event.status)) {
+        newStatus = 'customs';
+      } else if (['Handed to Local Carrier', 'Arrived at Local Depot'].includes(event.status)) {
+        newStatus = 'in_transit';
+      } else if (['Out for Delivery', 'Available at Parcel Point'].includes(event.status)) {
+        newStatus = 'out_for_delivery';
+      }
       
       await db.query('UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, shipment.id]);
     }
