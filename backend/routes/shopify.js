@@ -16,12 +16,10 @@ const authMiddleware = (req, res, next) => {
 // OAUTH FLOW - MED PER-STORE CREDENTIALS
 // ============================================
 
-// OAuth Step 1 - Start OAuth for en specifik store (bruger store's credentials)
 router.get('/auth/:storeId', async (req, res) => {
   const { storeId } = req.params;
   
   try {
-    // Hent store's credentials fra database
     const storeResult = await db.query(
       'SELECT id, domain, client_id, client_secret FROM shopify_stores WHERE id = $1',
       [storeId]
@@ -45,7 +43,6 @@ router.get('/auth/:storeId', async (req, res) => {
     const redirectUri = `${BACKEND_URL}/api/shopify/callback`;
     const nonce = crypto.randomBytes(16).toString('hex');
     
-    // Gem storeId i state så vi kan hente det igen i callback
     const state = Buffer.from(JSON.stringify({ storeId: store.id, nonce })).toString('base64');
     
     const authUrl = `https://${store.domain}/admin/oauth/authorize?client_id=${store.client_id}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
@@ -58,7 +55,6 @@ router.get('/auth/:storeId', async (req, res) => {
   }
 });
 
-// OAuth Step 2 - Callback (henter credentials fra database baseret på state)
 router.get('/callback', async (req, res) => {
   const { code, shop, state } = req.query;
   
@@ -72,7 +68,6 @@ router.get('/callback', async (req, res) => {
     let storeId = null;
     let store = null;
     
-    // Prøv at decode state (ny flow med storeId)
     if (state) {
       try {
         const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
@@ -83,7 +78,6 @@ router.get('/callback', async (req, res) => {
       }
     }
     
-    // Hent store - enten via storeId eller via shop domain
     if (storeId) {
       const storeResult = await db.query(
         'SELECT * FROM shopify_stores WHERE id = $1',
@@ -94,7 +88,6 @@ router.get('/callback', async (req, res) => {
       }
     }
     
-    // Fallback: Find store via shop domain
     if (!store && shop) {
       const storeResult = await db.query(
         'SELECT * FROM shopify_stores WHERE domain = $1',
@@ -110,13 +103,11 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/?error=store_not_found`);
     }
     
-    // Tjek at store har credentials
     if (!store.client_id || !store.client_secret) {
       console.error('[OAuth Callback] Store missing credentials');
       return res.redirect(`${FRONTEND_URL}/?error=missing_credentials`);
     }
     
-    // Byt code til access token med store's credentials
     console.log(`[OAuth Callback] Exchanging code for token for store ${store.domain}`);
     const response = await fetch(`https://${store.domain}/admin/oauth/access_token`, {
       method: 'POST',
@@ -135,7 +126,6 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/?error=oauth_failed`);
     }
     
-    // Gem access token og marker som connected
     await db.query(
       'UPDATE shopify_stores SET api_token = $1, is_connected = true, status = $2 WHERE id = $3',
       [data.access_token, 'active', store.id]
@@ -153,7 +143,6 @@ router.get('/callback', async (req, res) => {
 // STORE MANAGEMENT
 // ============================================
 
-// Get all stores (inkluderer is_connected og has_credentials) - KUN SHOPIFY
 router.get('/stores', authMiddleware, async (req, res) => {
   try {
     const result = await db.query(`
@@ -177,7 +166,6 @@ router.get('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Add new store (nu med client_id og client_secret) - SHOPIFY TYPE
 router.post('/stores', authMiddleware, async (req, res) => {
   try {
     const { 
@@ -193,7 +181,6 @@ router.post('/stores', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Domain is required' });
     }
     
-    // Tjek om store allerede eksisterer
     const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [domain]);
     if (existingStore.rows.length > 0) {
       return res.status(400).json({ error: 'Store with this domain already exists' });
@@ -231,7 +218,6 @@ router.post('/stores', authMiddleware, async (req, res) => {
   }
 });
 
-// Update store settings (inkl. client_id og client_secret)
 router.put('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -243,7 +229,6 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
       redelivery_days, attempts, post_delivery_event 
     } = req.body;
     
-    // Hent eksisterende store
     const existing = await db.query('SELECT * FROM shopify_stores WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Store not found' });
@@ -251,14 +236,12 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
     
     const currentStore = existing.rows[0];
     
-    // Tjek om credentials ændres - i så fald skal is_connected resettes
     let resetConnection = false;
     if ((client_id && client_id !== currentStore.client_id) || 
         (client_secret && client_secret !== currentStore.client_secret)) {
       resetConnection = true;
     }
     
-    // Byg update query dynamisk
     let updateFields = [];
     let params = [];
     let paramCount = 1;
@@ -280,7 +263,6 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
     if (attempts !== undefined) { updateFields.push(`attempts = $${paramCount++}`); params.push(attempts); }
     if (post_delivery_event !== undefined) { updateFields.push(`post_delivery_event = $${paramCount++}`); params.push(post_delivery_event); }
     
-    // Reset connection hvis credentials ændres
     if (resetConnection) {
       updateFields.push(`is_connected = false`);
       updateFields.push(`api_token = NULL`);
@@ -305,7 +287,6 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Toggle store status
 router.put('/stores/:id/status', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -318,7 +299,6 @@ router.put('/stores/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
-// Delete store
 router.delete('/stores/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -331,13 +311,12 @@ router.delete('/stores/:id', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// PENDING ORDERS (KUN UNFULFILLED) - KUN SHOPIFY STORES
+// PENDING ORDERS
 // ============================================
 router.get('/pending-orders', authMiddleware, async (req, res) => {
   try {
     console.log('[Pending Orders] Fetching unfulfilled orders...');
     
-    // Kun hent fra CONNECTED og ACTIVE SHOPIFY stores
     const storesResult = await db.query(
       "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
@@ -388,7 +367,7 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// FULFILLED ORDERS - KUN SHOPIFY STORES
+// FULFILLED ORDERS
 // ============================================
 router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
   try {
@@ -441,14 +420,13 @@ router.get('/fulfilled-orders', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// MANUEL FULFILL - KUN SHOPIFY STORES
+// MANUEL FULFILL
 // ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[Fetch-Fulfill] Manual trigger started...');
-  const { orderIds } = req.body; // Optional: specific order IDs to fulfill
+  const { orderIds } = req.body;
   
   try {
-    // Kun fra CONNECTED SHOPIFY stores
     const storesResult = await db.query(
       "SELECT * FROM shopify_stores WHERE status = $1 AND is_connected = true AND api_token IS NOT NULL AND (store_type = 'shopify' OR store_type IS NULL)",
       ['active']
@@ -460,7 +438,6 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
       console.log(`[Fetch-Fulfill] Processing store: ${store.domain}`);
       const allOrders = await fetchUnfulfilledOrders(store);
       
-      // Filter to specific orders if orderIds provided
       const orders = orderIds && orderIds.length > 0
         ? allOrders.filter(o => orderIds.includes(o.id))
         : allOrders;
@@ -513,7 +490,6 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
             store.id
           ]);
 
-          // Opret initial tracking event (Label Created)
           await db.query(`
             INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
             VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIME, NOW())
@@ -547,7 +523,7 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
 });
 
 // ============================================
-// AUTO UPDATE TRACKING EVENTS
+// AUTO UPDATE TRACKING EVENTS - FIXED VERSION
 // ============================================
 async function updateTrackingEvents() {
   console.log('[Auto-Events] Starting automatic tracking events update...');
@@ -594,15 +570,12 @@ async function updateShipmentEvents(shipment) {
   );
   const existingStatuses = eventsResult.rows.map(e => e.status);
   
-  // Get store settings (same as before)
   const originCountry = shipment.origin_country || shipment.country_origin || 'United Kingdom';
   const transitCountry = shipment.transit_country || 'Netherlands';
   const destinationCountry = shipment.destination_country || shipment.country || 'Denmark';
   const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 7;
-  const sortingDays = shipment.sorting_days || shipment.store_sorting_days || 3;
   const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
   
-  // Get country code
   const getCountryCode = (country) => {
     const codes = {
       'United Kingdom': 'UK', 'Germany': 'DE', 'Denmark': 'DK', 'Netherlands': 'NL',
@@ -613,109 +586,120 @@ async function updateShipmentEvents(shipment) {
   };
   
   const originCode = getCountryCode(originCountry);
-  const destCode = getCountryCode(destinationCountry);
   
-  // Calculate event days spread across delivery period
   const totalEvents = 18;
   const dayStep = Math.max(0.5, deliveryDays / totalEvents);
   
-  // NEW EVENT SCHEDULE based on PDF - 18 tracking events
+  // Event schedule with PRIORITY for status determination
+  // Higher priority number = more advanced in delivery process
   const eventSchedule = [
-    // Origin country events
-    { day: 0, status: 'Label Created', 
+    { day: 0, status: 'Label Created', priority: 1,
       location: `${originCountry}`, 
       description: `Shipment information received. Label created in ${originCountry}.` },
     
-    { day: Math.floor(dayStep * 1), status: 'Package Received', 
+    { day: Math.floor(dayStep * 1), status: 'Package Received', priority: 2,
       location: `Origin Facility, ${originCountry} (${originCode})`, 
       description: `Parcel received and scanned at origin facility (${originCode}).` },
     
-    { day: Math.floor(dayStep * 2), status: 'Processed at Origin Hub', 
+    { day: Math.floor(dayStep * 2), status: 'Processed at Origin Hub', priority: 3,
       location: `${originCountry} Origin Hub`, 
       description: `Processed through ${originCountry} Origin Hub (sorting & outbound preparation).` },
     
-    { day: Math.floor(dayStep * 3), status: 'Departed Origin Facility', 
+    { day: Math.floor(dayStep * 3), status: 'Departed Origin Facility', priority: 4,
       location: `${originCountry} (${originCode}) Origin Hub`, 
       description: `Departed ${originCountry} (${originCode}) Origin Hub — linehaul to Export Hub.` },
     
-    { day: Math.floor(dayStep * 4), status: 'In Transit', 
+    { day: Math.floor(dayStep * 4), status: 'In Transit to Export', priority: 5,
       location: `${originCountry}`, 
       description: `In transit by road to Export Hub (${originCode}).` },
     
-    // Export hub events
-    { day: Math.floor(dayStep * 5), status: 'Arrived at Export Hub', 
+    { day: Math.floor(dayStep * 5), status: 'Arrived at Export Hub', priority: 6,
       location: `Export Hub (${originCode})`, 
       description: `Arrived at Export Hub (${originCode}) — export processing initiated.` },
     
-    { day: Math.floor(dayStep * 6), status: 'Export Documentation Check', 
+    { day: Math.floor(dayStep * 6), status: 'Export Documentation Check', priority: 7,
       location: `Export Hub (${originCode})`, 
       description: `Export documentation verification and security screening completed.` },
     
-    { day: Math.floor(dayStep * 7), status: 'Departed Export Hub', 
+    { day: Math.floor(dayStep * 7), status: 'Departed Export Hub', priority: 8,
       location: `Export Hub (${originCode})`, 
       description: `Departed (${originCode}) — cross-border linehaul to port facility.` },
     
-    { day: Math.floor(dayStep * 8), status: 'Awaiting Vessel / Linehaul Queue', 
+    { day: Math.floor(dayStep * 8), status: 'Awaiting Vessel / Linehaul Queue', priority: 9,
       location: `Port Facility`, 
       description: `Awaiting departure slot at port facility (road/ferry routing).` },
     
-    // Cross-border transit
-    { day: Math.floor(dayStep * 9), status: 'In Transit', 
+    { day: Math.floor(dayStep * 9), status: 'In Transit International', priority: 10,
       location: `${transitCountry}`, 
       description: `In transit — cross-channel movement (non-air route).` },
     
-    // Destination country events
-    { day: Math.floor(dayStep * 10), status: 'Arrived in ' + destinationCountry, 
+    { day: Math.floor(dayStep * 10), status: 'Arrived in ' + destinationCountry, priority: 11,
       location: `${destinationCountry} Import Facility`, 
       description: `Arrived at ${destinationCountry} Import Facility — inbound scan completed.` },
     
-    { day: Math.floor(dayStep * 11), status: 'Customs Hold', 
+    { day: Math.floor(dayStep * 11), status: 'Customs Hold', priority: 12,
       location: `Customs, ${destinationCountry}`, 
       description: `Held for customs review in ${destinationCountry} (routine clearance).` },
     
-    { day: Math.floor(dayStep * 12), status: 'Customs Processing', 
+    { day: Math.floor(dayStep * 12), status: 'Customs Processing', priority: 13,
       location: `Customs, ${destinationCountry}`, 
       description: `Customs processing underway — additional checks may apply.` },
     
-    { day: Math.floor(dayStep * 13), status: 'Cleared Customs', 
+    { day: Math.floor(dayStep * 13), status: 'Cleared Customs', priority: 14,
       location: `Customs, ${destinationCountry}`, 
       description: `Cleared customs in ${destinationCountry} — released to carrier network.` },
     
-    { day: Math.floor(dayStep * 14), status: 'Handed to Local Carrier', 
+    { day: Math.floor(dayStep * 14), status: 'Handed to Local Carrier', priority: 15,
       location: `${destinationCountry}`, 
       description: `Handed over to ${destinationCountry} domestic carrier for final-mile delivery.` },
     
-    { day: Math.floor(dayStep * 15), status: 'In Transit', 
+    { day: Math.floor(dayStep * 15), status: 'In Transit Local', priority: 16,
       location: `${destinationCountry}`, 
       description: `In transit to destination region sorting facility (${destinationCountry}).` },
     
-    { day: Math.floor(dayStep * 16), status: 'Arrived at Local Depot', 
+    { day: Math.floor(dayStep * 16), status: 'Arrived at Local Depot', priority: 17,
       location: `${shipment.city || 'Local Depot'}, ${destinationCountry}`, 
       description: `Arrived at local delivery depot — delivery planning in progress.` },
     
-    { day: Math.floor(dayStep * 17), status: 'Out for Delivery', 
+    { day: Math.floor(dayStep * 17), status: 'Out for Delivery', priority: 18,
       location: `${shipment.city || 'Local'}, ${destinationCountry}`, 
       description: `Out for delivery in destination area (${destinationCountry}).` }
   ];
   
-  // Add parcel point event if enabled
   if (parcelPoint) {
     eventSchedule.push({
       day: Math.floor(dayStep * 18),
       status: 'Available at Parcel Point',
+      priority: 19,
       location: `Parcel Point, ${shipment.city || destinationCountry}`,
       description: `Package available for pickup at local parcel point.`
     });
   }
   
-  // Process each event
+  // Track the highest priority event added
+  let highestPriority = 0;
+  let highestPriorityEvent = null;
+  
+  // First, find the highest priority existing event
+  for (const event of eventSchedule) {
+    if (existingStatuses.includes(event.status)) {
+      if (event.priority > highestPriority) {
+        highestPriority = event.priority;
+        highestPriorityEvent = event;
+      }
+    }
+  }
+  
+  // Process each event and add new ones
   for (const event of eventSchedule) {
     if (daysSinceCreation >= event.day && !existingStatuses.includes(event.status)) {
       const eventDate = new Date(createdAt);
       eventDate.setDate(eventDate.getDate() + event.day);
       
-      // Random time between 6:00 and 20:00
-      const hour = 6 + Math.floor(Math.random() * 14);
+      // Generate time that's LATER than previous events on same day
+      // Base time increases with priority
+      const baseHour = 6 + Math.floor(event.priority * 0.7);
+      const hour = Math.min(20, baseHour + Math.floor(Math.random() * 2));
       const minute = Math.floor(Math.random() * 60);
       const eventTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
       
@@ -724,27 +708,39 @@ async function updateShipmentEvents(shipment) {
         VALUES ($1, $2, $3, $4, $5, $6, NOW())
       `, [shipment.id, event.status, event.location, event.description, eventDate.toISOString().split('T')[0], eventTime]);
       
-      console.log(`[Auto-Events] Added "${event.status}" for shipment ${shipment.tracking_number}`);
+      console.log(`[Auto-Events] Added "${event.status}" (priority ${event.priority}) for shipment ${shipment.tracking_number}`);
       
-      // Update shipment status based on event
-      let newStatus = 'label_created';
-      if (['Package Received', 'Processed at Origin Hub'].includes(event.status)) {
-        newStatus = 'processing';
-      } else if (['Departed Origin Facility', 'In Transit', 'Arrived at Export Hub', 
-                  'Export Documentation Check', 'Departed Export Hub', 'Awaiting Vessel / Linehaul Queue'].includes(event.status)) {
-        newStatus = 'in_transit';
-      } else if (event.status.startsWith('Arrived in ')) {
-        newStatus = 'in_transit';
-      } else if (['Customs Hold', 'Customs Processing', 'Cleared Customs'].includes(event.status)) {
-        newStatus = 'customs';
-      } else if (['Handed to Local Carrier', 'Arrived at Local Depot'].includes(event.status)) {
-        newStatus = 'in_transit';
-      } else if (['Out for Delivery', 'Available at Parcel Point'].includes(event.status)) {
-        newStatus = 'out_for_delivery';
+      // Update highest priority if this event is higher
+      if (event.priority > highestPriority) {
+        highestPriority = event.priority;
+        highestPriorityEvent = event;
       }
-      
-      await db.query('UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, shipment.id]);
     }
+  }
+  
+  // NOW update shipment status based on HIGHEST PRIORITY event
+  if (highestPriorityEvent) {
+    let newStatus = 'label_created';
+    
+    if (highestPriority >= 18) {
+      // Out for Delivery or Available at Parcel Point
+      newStatus = 'out_for_delivery';
+    } else if (highestPriority >= 15) {
+      // Handed to Local Carrier, In Transit Local, Arrived at Local Depot
+      newStatus = 'in_transit';
+    } else if (highestPriority >= 12) {
+      // Customs Hold, Processing, Cleared
+      newStatus = 'in_transit';
+    } else if (highestPriority >= 4) {
+      // Departed Origin through Arrived in destination
+      newStatus = 'in_transit';
+    } else if (highestPriority >= 2) {
+      // Package Received, Processed at Origin Hub
+      newStatus = 'label_created';
+    }
+    
+    await db.query('UPDATE shipments SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, shipment.id]);
+    console.log(`[Auto-Events] Updated shipment ${shipment.tracking_number} status to: ${newStatus} (based on priority ${highestPriority})`);
   }
 }
 
