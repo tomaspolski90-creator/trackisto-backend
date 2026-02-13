@@ -490,4 +490,134 @@ router.post('/test-connection', authMiddleware, async (req, res) => {
   }
 });
 
+// ============================================
+// AUTO-FULFILLMENT (called by cron)
+// ============================================
+function getDanishTime() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
+}
+
+async function processWooCommerceAutoFulfillment() {
+  console.log('[WooCommerce Auto-Fulfill] Starting auto-fulfillment check...');
+  const danishTime = getDanishTime();
+  const currentHour = danishTime.getHours();
+  const currentMinute = danishTime.getMinutes();
+  const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+  
+  console.log(`[WooCommerce Auto-Fulfill] Danish time: ${currentTimeStr}`);
+
+  try {
+    const storesResult = await db.query(
+      "SELECT * FROM shopify_stores WHERE status = $1 AND store_type = 'woocommerce' AND is_connected = true",
+      ['active']
+    );
+    
+    console.log(`[WooCommerce Auto-Fulfill] Found ${storesResult.rows.length} connected WooCommerce stores`);
+
+    for (const store of storesResult.rows) {
+      const fulfillmentTime = store.fulfillment_time || '16:00';
+      const [targetHour, targetMinute] = fulfillmentTime.split(':').map(Number);
+      
+      const targetMinutes = targetHour * 60 + targetMinute;
+      const currentMinutes = currentHour * 60 + currentMinute;
+      const diff = Math.abs(targetMinutes - currentMinutes);
+      
+      if (diff <= 15) {
+        console.log(`[WooCommerce Auto-Fulfill] Processing store ${store.domain} (target: ${fulfillmentTime})`);
+        
+        const orders = await fetchWooCommerceOrders(store, 'processing');
+        console.log(`[WooCommerce Auto-Fulfill] Found ${orders.length} processing orders`);
+
+        for (const order of orders) {
+          // Check if already processed
+          const existing = await db.query(
+            'SELECT id FROM shipments WHERE shopify_order_id = $1',
+            [order.id.toString()]
+          );
+          
+          if (existing.rows.length > 0) {
+            console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - already processed`);
+            continue;
+          }
+
+          // Check send offset
+          const sendOffset = store.send_offset || 0;
+          if (sendOffset > 0) {
+            const orderDate = new Date(order.date_created);
+            const now = new Date();
+            const daysSinceOrder = Math.floor((now - orderDate) / (24 * 60 * 60 * 1000));
+            if (daysSinceOrder < sendOffset) {
+              console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - send offset not reached (${daysSinceOrder}/${sendOffset} days)`);
+              continue;
+            }
+          }
+
+          const address = order.shipping?.address_1 ? order.shipping : order.billing;
+          
+          if (!address || !address.first_name) {
+            console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - no address`);
+            continue;
+          }
+
+          try {
+            const trackingNumber = 'DK' + Date.now() + Math.floor(Math.random() * 1000);
+            const trackingUrl = `https://rvslogistics.com/?tracking=${trackingNumber}`;
+            
+            console.log(`[WooCommerce Auto-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber}`);
+            
+            await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
+            
+            const shipmentResult = await db.query(`
+              INSERT INTO shipments (
+                tracking_number, customer_name, customer_email, shipping_address,
+                city, state, zip_code, country, origin_country, destination_country,
+                status, delivery_days, sorting_days, estimated_delivery, price,
+                shopify_order_id, shopify_store_id, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+              RETURNING id
+            `, [
+              trackingNumber,
+              `${address.first_name || ''} ${address.last_name || ''}`.trim(),
+              order.billing?.email || '',
+              `${address.address_1 || ''} ${address.address_2 || ''}`.trim(),
+              address.city || '',
+              address.state || '',
+              address.postcode || '',
+              address.country || '',
+              store.country_origin || 'United Kingdom',
+              address.country || '',
+              'label_created',
+              store.delivery_days || 7,
+              store.sorting_days || 3,
+              new Date(Date.now() + (store.delivery_days || 7) * 24 * 60 * 60 * 1000),
+              parseFloat(order.total) || 0,
+              order.id.toString(),
+              store.id
+            ]);
+            
+            await db.query(`
+              INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
+              VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIME, NOW())
+            `, [
+              shipmentResult.rows[0].id,
+              'Label Created',
+              `${store.country_origin || 'United Kingdom'}, ${store.country_origin || 'United Kingdom'}`,
+              `Label created in ${store.country_origin || 'United Kingdom'}`
+            ]);
+            
+            console.log(`[WooCommerce Auto-Fulfill] Saved shipment ${trackingNumber}`);
+          } catch (orderError) {
+            console.error(`[WooCommerce Auto-Fulfill] Error processing order ${order.id}:`, orderError);
+          }
+        }
+      } else {
+        console.log(`[WooCommerce Auto-Fulfill] Skipping store ${store.domain} - not within fulfillment window (current: ${currentTimeStr}, target: ${fulfillmentTime})`);
+      }
+    }
+  } catch (error) {
+    console.error('[WooCommerce Auto-Fulfill] Error:', error);
+  }
+}
+
+router.processWooCommerceAutoFulfillment = processWooCommerceAutoFulfillment;
 module.exports = router;
