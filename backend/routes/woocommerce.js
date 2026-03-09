@@ -12,58 +12,58 @@ const authMiddleware = (req, res, next) => {
 // WOOCOMMERCE API HELPER FUNCTIONS
 // ============================================
 
+// ✅ ÆNDRET: Fjernet consumer_key/secret fra URL - bruges nu kun til base URL
 function buildWooCommerceUrl(store, endpoint) {
-  // Clean the domain - remove any protocol and trailing slashes
   let domain = store.domain
     .replace(/^https?:\/\//, '')
     .replace(/\/+$/, '');
-  
-  const baseUrl = `https://${domain}/wp-json/wc/v3/${endpoint}`;
-  const url = new URL(baseUrl);
-  url.searchParams.append('consumer_key', store.client_id);
-  url.searchParams.append('consumer_secret', store.client_secret);
-  return url.toString();
+  return `https://${domain}/wp-json/wc/v3/${endpoint}`;
+}
+
+// ✅ NY FUNKTION: Basic Auth header i stedet for credentials i URL
+function getAuthHeaders(store) {
+  const credentials = Buffer.from(`${store.client_id}:${store.client_secret}`).toString('base64');
+  return {
+    'Authorization': `Basic ${credentials}`,
+    'Content-Type': 'application/json',
+    'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
+    'Accept': 'application/json'
+  };
 }
 
 async function fetchWooCommerceOrders(store, status = 'processing') {
   try {
-    const url = buildWooCommerceUrl(store, 'orders');
-    const fullUrl = `${url}&status=${status}&per_page=50`;
-    
+    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
+    const baseUrl = buildWooCommerceUrl(store, 'orders');
+    const fullUrl = `${baseUrl}?status=${status}&per_page=50`;
+
     console.log(`[WooCommerce] Fetching orders from ${store.domain} with status: ${status}`);
-    console.log(`[WooCommerce] Full URL: ${fullUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***')}`);
-    
+
     const response = await fetch(fullUrl, {
       method: 'GET',
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
-        'Accept': 'application/json'
-      }
+      headers: getAuthHeaders(store)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 500)}`);
       return [];
     }
-    
+
     const responseText = await response.text();
-    
-    // Check if response is HTML instead of JSON
+
     if (responseText.trim().startsWith('<')) {
       console.error(`[WooCommerce] Received HTML instead of JSON from ${store.domain}`);
       console.error(`[WooCommerce] HTML content: ${responseText.substring(0, 500)}`);
       return [];
     }
-    
+
     try {
       const orders = JSON.parse(responseText);
       console.log(`[WooCommerce] Found ${orders.length} orders with status ${status}`);
       return orders;
     } catch (parseError) {
       console.error(`[WooCommerce] JSON parse error: ${parseError.message}`);
-      console.error(`[WooCommerce] Response content: ${responseText.substring(0, 500)}`);
       return [];
     }
   } catch (error) {
@@ -74,15 +74,12 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
 
 async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUrl) {
   try {
+    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
     const url = buildWooCommerceUrl(store, `orders/${orderId}`);
-    
+
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
-        'Accept': 'application/json'
-      },
+      headers: getAuthHeaders(store),
       body: JSON.stringify({
         status: 'completed',
         meta_data: [
@@ -91,27 +88,23 @@ async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUr
         ]
       })
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to update order: ${response.status} - ${errorText}`);
     }
-    
-    // Add order note with tracking info
+
+    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
     const noteUrl = buildWooCommerceUrl(store, `orders/${orderId}/notes`);
     await fetch(noteUrl, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
-        'Accept': 'application/json'
-      },
+      headers: getAuthHeaders(store),
       body: JSON.stringify({
         note: `Order shipped! Tracking number: ${trackingNumber}\nTrack your order: ${trackingUrl}`,
         customer_note: true
       })
     });
-    
+
     console.log(`[WooCommerce] Updated order ${orderId} with tracking ${trackingNumber}`);
     return await response.json();
   } catch (error) {
@@ -161,7 +154,6 @@ router.post('/stores', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Domain is required' });
     }
     
-    // Clean the domain
     domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     
     const existingStore = await db.query('SELECT id FROM shopify_stores WHERE domain = $1', [domain]);
@@ -169,7 +161,6 @@ router.post('/stores', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Store with this domain already exists' });
     }
     
-    // WooCommerce connects automatically when credentials are provided
     const isConnected = client_id && client_secret ? true : false;
     const initialStatus = isConnected ? 'active' : 'inactive';
     
@@ -221,7 +212,6 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Store not found' });
     }
     
-    // Clean the domain if provided
     if (domain) {
       domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     }
@@ -247,7 +237,6 @@ router.put('/stores/:id', authMiddleware, async (req, res) => {
     if (attempts !== undefined) { updateFields.push(`attempts = $${paramCount++}`); params.push(attempts); }
     if (post_delivery_event !== undefined) { updateFields.push(`post_delivery_event = $${paramCount++}`); params.push(post_delivery_event); }
     
-    // Auto-connect if credentials are provided
     if (client_id && client_secret) {
       updateFields.push(`is_connected = true`);
       updateFields.push(`status = 'active'`);
@@ -343,7 +332,7 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
 // ============================================
 router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
   console.log('[WooCommerce Fetch-Fulfill] Starting...');
-  const { orderIds } = req.body; // Optional: specific order IDs to fulfill
+  const { orderIds } = req.body;
   
   try {
     const storesResult = await db.query(
@@ -358,7 +347,6 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
       console.log(`[WooCommerce Fetch-Fulfill] Processing store: ${store.domain}`);
       const allOrders = await fetchWooCommerceOrders(store, 'processing');
       
-      // Filter to specific orders if orderIds provided
       const orders = orderIds && orderIds.length > 0
         ? allOrders.filter(o => orderIds.includes(o.id))
         : allOrders;
@@ -425,7 +413,7 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
           `, [
             shipmentResult.rows[0].id,
             'Label Created',
-            `${store.country_origin || 'United Kingdom'}, ${store.country_origin || 'United Kingdom'}`,
+            store.country_origin || 'United Kingdom',
             `Label created in ${store.country_origin || 'United Kingdom'}`
           ]);
           
@@ -460,19 +448,15 @@ router.post('/test-connection', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Clean the domain
     domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     
     const store = { domain, client_id, client_secret };
+    // ✅ ÆNDRET: Basic Auth header i stedet for URL params
     const url = buildWooCommerceUrl(store, 'system_status');
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 
-        'Content-Type': 'application/json',
-        'User-Agent': 'Trackisto/1.0 (WooCommerce Integration)',
-        'Accept': 'application/json'
-      }
+      headers: getAuthHeaders(store)
     });
     
     if (response.ok) {
@@ -529,7 +513,6 @@ async function processWooCommerceAutoFulfillment() {
         console.log(`[WooCommerce Auto-Fulfill] Found ${orders.length} processing orders`);
 
         for (const order of orders) {
-          // Check if already processed
           const existing = await db.query(
             'SELECT id FROM shipments WHERE shopify_order_id = $1',
             [order.id.toString()]
@@ -540,7 +523,6 @@ async function processWooCommerceAutoFulfillment() {
             continue;
           }
 
-          // Check send offset
           const sendOffset = store.send_offset || 0;
           if (sendOffset > 0) {
             const orderDate = new Date(order.date_created);
@@ -601,7 +583,7 @@ async function processWooCommerceAutoFulfillment() {
             `, [
               shipmentResult.rows[0].id,
               'Label Created',
-              `${store.country_origin || 'United Kingdom'}, ${store.country_origin || 'United Kingdom'}`,
+              store.country_origin || 'United Kingdom',
               `Label created in ${store.country_origin || 'United Kingdom'}`
             ]);
             
