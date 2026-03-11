@@ -372,10 +372,11 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
         }
         
         try {
-          const trackingNumber = 'DK' + Date.now() + Math.floor(Math.random() * 1000);
+          const countryCode = (address.country || 'XX').toUpperCase();
+          const trackingNumber = countryCode + Date.now() + Math.floor(Math.random() * 1000);
           const trackingUrl = `https://rvslogistics.com/?tracking=${trackingNumber}`;
           
-          console.log(`[WooCommerce Fetch-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber}`);
+          console.log(`[WooCommerce Fetch-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (country: ${countryCode})`);
           
           await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
           
@@ -542,10 +543,11 @@ async function processWooCommerceAutoFulfillment() {
           }
 
           try {
-            const trackingNumber = 'DK' + Date.now() + Math.floor(Math.random() * 1000);
+            const countryCode = (address.country || 'XX').toUpperCase();
+            const trackingNumber = countryCode + Date.now() + Math.floor(Math.random() * 1000);
             const trackingUrl = `https://rvslogistics.com/?tracking=${trackingNumber}`;
             
-            console.log(`[WooCommerce Auto-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber}`);
+            console.log(`[WooCommerce Auto-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (country: ${countryCode})`);
             
             await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
             
