@@ -79,35 +79,16 @@
         .breadcrumb a { color: var(--text-muted); text-decoration: none; }
         .breadcrumb a:hover { color: var(--accent); }
         .breadcrumb svg { width: 12px; height: 12px; fill: var(--text-muted); flex-shrink: 0; }
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            color: var(--green);
-            font-weight: 500;
-        }
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            background: var(--green);
-            border-radius: 50%;
-            animation: pulse-dot 2s ease-in-out infinite;
-        }
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
 
         /* ── SUPPORT HEADER ── */
         .support-header {
             background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 56px 24px 48px;
+            padding: 56px 24px 60px;
         }
         .support-header-inner {
             max-width: 1200px;
             margin: 0 auto;
+            text-align: center;
         }
         .support-header h1 {
             font-size: 32px;
@@ -121,15 +102,14 @@
             color: var(--text-secondary);
             line-height: 1.6;
             max-width: 520px;
+            margin: 0 auto;
         }
 
         /* ── QUICK TRACK INLINE ── */
         .quick-track {
             max-width: 1200px;
-            margin: -24px auto 0;
-            padding: 0 24px;
-            position: relative;
-            z-index: 10;
+            margin: 0 auto;
+            padding: 0 24px 0;
         }
         .quick-track-card {
             background: var(--navy-deep);
@@ -225,31 +205,7 @@
         .issue-card {
             background: var(--surface);
             padding: 32px 28px;
-            cursor: pointer;
-            transition: all 0.15s;
             position: relative;
-        }
-        .issue-card:hover {
-            background: var(--surface-raised);
-        }
-        .issue-card.selected {
-            background: var(--accent-soft);
-        }
-        .issue-card.selected .issue-icon {
-            background: var(--accent);
-        }
-        .issue-card.selected .issue-icon svg {
-            fill: #fff;
-        }
-        .issue-card.selected::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 28px;
-            right: 28px;
-            height: 2px;
-            background: var(--accent);
-            border-radius: 2px 2px 0 0;
         }
         .issue-icon {
             width: 40px;
@@ -620,10 +576,6 @@
                 <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
                 <span>Support</span>
             </div>
-            <div class="status-badge">
-                <div class="status-dot"></div>
-                All systems operational
-            </div>
         </div>
     </div>
 
@@ -656,7 +608,7 @@
         </div>
 
         <div class="issue-grid animate-in delay-3">
-            <div class="issue-card selected" onclick="selectIssue(this, 'Tracking Issue')">
+            <div class="issue-card">
                 <div class="issue-icon">
                     <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                 </div>
@@ -664,7 +616,7 @@
                 <p>Status not updating, missing events, or tracking number not found</p>
                 <span class="issue-tag tag-green">Avg. 2h response</span>
             </div>
-            <div class="issue-card" onclick="selectIssue(this, 'Delivery Problem')">
+            <div class="issue-card">
                 <div class="issue-icon">
                     <svg viewBox="0 0 24 24"><path d="M18 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM19.5 9.5L21.46 12H17V9.5h2.5zM6 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg>
                 </div>
@@ -672,7 +624,7 @@
                 <p>Late delivery, damaged parcel, wrong address, or failed attempt</p>
                 <span class="issue-tag tag-amber">Avg. 4h response</span>
             </div>
-            <div class="issue-card" onclick="selectIssue(this, 'General Inquiry')">
+            <div class="issue-card">
                 <div class="issue-icon">
                     <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
                 </div>
@@ -713,7 +665,16 @@
                         </div>
                     </div>
 
-                    <input type="hidden" name="subject" id="subject" value="Tracking Issue">
+                    <div class="field">
+                        <label>Issue type</label>
+                        <select name="subject" id="subject">
+                            <option value="Tracking Issue">Tracking Issue</option>
+                            <option value="Delivery Problem">Delivery Problem</option>
+                            <option value="General Inquiry">General Inquiry</option>
+                            <option value="Feedback">Feedback</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
 
                     <div class="field">
                         <label>Tracking number <span class="optional">— optional</span></label>
@@ -842,12 +803,7 @@
         document.getElementById('sidebarEmail').innerHTML = '<a href="mai' + 'lto:' + e + '">' + e + '</a>';
         document.getElementById('footerEmail').textContent = e;
 
-        // Issue card selection
-        function selectIssue(card, value) {
-            document.querySelectorAll('.issue-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            document.getElementById('subject').value = value;
-        }
+        // Issue type is selected via dropdown in form
 
         // Quick track
         function quickTrack() {
