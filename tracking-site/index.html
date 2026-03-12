@@ -160,6 +160,15 @@
     </style>
 </head>
 <body>
+    <script>
+        // Instantly hide landing page if tracking parameter exists - prevents flash of homepage
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('tracking')) {
+                document.write('<style>#heroSection,#featuresSection,#sustainabilitySection{display:none!important}.results{display:block!important}</style>');
+            }
+        })();
+    </script>
     <header class="header">
         <div class="header-content">
             <nav class="nav-left">
@@ -288,7 +297,7 @@
         var user = 'support'; var domain = 'rvslogistics.com';
         document.getElementById('footerEmail').textContent = user + '@' + domain;
 
-        const API_URL = 'https://trackisto-backend.onrender.com';
+        const API_URL = 'https://trackisto-backend-production.up.railway.app';
         let currentTrackingNumber = '';
 
         window.addEventListener('DOMContentLoaded', () => {
