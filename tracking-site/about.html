@@ -3,86 +3,576 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About Us - RVS Logistics</title>
+    <title>Platform — RVS Logistics</title>
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #333; }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        .header { background: #0d234b; padding: 12px 24px; position: relative; }
+        :root {
+            --navy: #0d234b;
+            --navy-deep: #081a38;
+            --navy-90: rgba(13, 35, 75, 0.9);
+            --accent: #29ABE2;
+            --accent-soft: rgba(41, 171, 226, 0.07);
+            --accent-border: rgba(41, 171, 226, 0.2);
+            --text-primary: #1a1f36;
+            --text-body: #3c4257;
+            --text-secondary: #525f7f;
+            --text-muted: #8792a2;
+            --border: #e3e8ee;
+            --border-light: #eef1f6;
+            --surface: #ffffff;
+            --surface-alt: #f7f9fc;
+            --surface-warm: #fafbfd;
+            --green: #0d9b58;
+            --green-soft: rgba(13, 155, 88, 0.07);
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--surface);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── HEADER ── */
+        .header { background: var(--navy); padding: 12px 24px; position: relative; }
         .header-content { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
         .nav-left, .nav-right { display: flex; gap: 32px; flex: 1; }
         .nav-left { justify-content: flex-start; }
         .nav-right { justify-content: flex-end; }
         .nav-left a, .nav-right a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; transition: color 0.2s; }
-        .nav-left a:hover, .nav-right a:hover { color: #29ABE2; }
+        .nav-left a:hover, .nav-right a:hover { color: var(--accent); }
         .logo { display: flex; align-items: center; justify-content: center; padding: 0 40px; }
         .logo img { height: 65px; width: auto; }
         .mobile-menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
         .mobile-menu-btn svg { width: 28px; height: 28px; fill: white; }
-        .mobile-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0d234b; flex-direction: column; padding: 20px; gap: 16px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; }
+        .mobile-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--navy); flex-direction: column; padding: 20px; gap: 16px; border-top: 1px solid rgba(255,255,255,0.1); z-index: 100; }
         .mobile-nav.show { display: flex; }
         .mobile-nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 15px; padding: 8px 0; }
 
-        .hero { background: linear-gradient(135deg, #29ABE2 0%, #0d234b 100%); color: white; padding: 80px 24px; text-align: center; }
-        .hero h1 { font-size: 48px; font-weight: 700; margin-bottom: 16px; }
-        .hero p { font-size: 18px; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+        /* ── OPENER — full-width intro with asymmetric layout ── */
+        .opener {
+            background: var(--navy-deep);
+            padding: 100px 24px 80px;
+            overflow: hidden;
+            position: relative;
+        }
+        .opener::after {
+            content: '';
+            position: absolute;
+            top: -200px;
+            right: -100px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(41,171,226,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .opener-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+        }
+        .opener-text { position: relative; z-index: 1; }
+        .opener-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 24px;
+            padding: 6px 12px;
+            background: rgba(41,171,226,0.08);
+            border-radius: 4px;
+        }
+        .opener h1 {
+            font-size: 44px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.15;
+            letter-spacing: -1px;
+            margin-bottom: 20px;
+        }
+        .opener h1 span {
+            color: var(--accent);
+        }
+        .opener-desc {
+            font-size: 17px;
+            color: rgba(255,255,255,0.65);
+            line-height: 1.7;
+            max-width: 480px;
+        }
+        .opener-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+        .metric {
+            padding: 32px 28px;
+            background: rgba(255,255,255,0.03);
+        }
+        .metric-value {
+            font-family: var(--mono);
+            font-size: 32px;
+            font-weight: 500;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        .metric-label {
+            font-size: 13px;
+            color: rgba(255,255,255,0.45);
+            letter-spacing: 0.3px;
+        }
 
-        .container { max-width: 900px; margin: -40px auto 60px; padding: 0 24px; position: relative; z-index: 10; }
-        .content-card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 50px; }
-        .content-card h2 { font-size: 28px; color: #0d234b; margin-bottom: 20px; margin-top: 40px; }
-        .content-card h2:first-child { margin-top: 0; }
-        .content-card p { line-height: 1.8; color: #555; margin-bottom: 16px; font-size: 16px; }
+        /* ── CONCEPT STRIP — horizontal scrolling concept ── */
+        .concept-strip {
+            background: var(--surface-alt);
+            border-bottom: 1px solid var(--border);
+            border-top: 1px solid var(--border);
+            padding: 0;
+            overflow: hidden;
+        }
+        .concept-strip-inner {
+            display: flex;
+            animation: scroll-strip 30s linear infinite;
+        }
+        .concept-item {
+            flex-shrink: 0;
+            padding: 20px 48px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .concept-item::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            background: var(--accent);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        @keyframes scroll-strip {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 40px 0; }
-        .stat-card { text-align: center; padding: 32px 20px; background: #f0f8fc; border-radius: 12px; border-top: 4px solid #29ABE2; }
-        .stat-number { font-size: 48px; font-weight: 700; color: #0d234b; margin-bottom: 8px; }
-        .stat-label { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        /* ── SECTION WRAPPER ── */
+        .section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 80px 24px;
+        }
+        .section + .section {
+            padding-top: 0;
+        }
 
-        .values-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin: 32px 0; }
-        .value-card { padding: 28px; background: #ffffff; border-radius: 12px; border-left: 4px solid #29ABE2; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .value-icon { width: 48px; height: 48px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; }
-        .value-icon svg { width: 40px; height: 40px; fill: #29ABE2; }
-        .value-card h3 { font-size: 20px; color: #0d234b; margin-bottom: 12px; }
-        .value-card p { font-size: 15px; color: #666; line-height: 1.6; margin-bottom: 0; }
+        /* ── HOW IT WORKS — numbered process ── */
+        .process-intro {
+            max-width: 560px;
+            margin-bottom: 56px;
+        }
+        .eyebrow {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .section-desc {
+            font-size: 16px;
+            color: var(--text-secondary);
+            line-height: 1.65;
+        }
 
-        .highlight-box { background: #f0f8fc; border-radius: 12px; padding: 30px; margin: 30px 0; }
-        .highlight-item { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-        .highlight-item:last-child { margin-bottom: 0; }
-        .highlight-item svg { width: 24px; height: 24px; fill: #29ABE2; flex-shrink: 0; margin-top: 2px; }
-        .highlight-item p { margin: 0; font-size: 15px; }
-        .highlight-item strong { color: #0d234b; }
+        .process-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            position: relative;
+        }
+        .process-grid::before {
+            content: '';
+            position: absolute;
+            top: 28px;
+            left: 56px;
+            right: 56px;
+            height: 1px;
+            background: var(--border);
+            z-index: 0;
+        }
+        .process-step {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 0 16px;
+        }
+        .step-num {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-family: var(--mono);
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+        .process-step:hover .step-num {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-soft);
+        }
+        .process-step h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .process-step p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
 
-        .footer { background: #0d234b; color: white; padding: 60px 24px 30px; margin-top: 80px; }
+        /* ── TECHNOLOGY — asymmetric two-col ── */
+        .tech-section {
+            background: var(--surface-alt);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+        .tech-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 80px 24px;
+            display: grid;
+            grid-template-columns: 5fr 7fr;
+            gap: 72px;
+            align-items: start;
+        }
+        .tech-sidebar {
+            position: sticky;
+            top: 40px;
+        }
+        .tech-features { display: flex; flex-direction: column; gap: 2px; }
+        .tech-feature {
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            gap: 16px;
+            padding: 24px;
+            background: var(--surface);
+            border-radius: 8px;
+            align-items: start;
+        }
+        .tech-feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tech-feature-icon svg { width: 22px; height: 22px; fill: var(--accent); }
+        .tech-feature h4 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .tech-feature p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* ── COVERAGE MAP (text-based) ── */
+        .coverage {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            align-items: start;
+        }
+        .coverage-list { list-style: none; }
+        .coverage-list li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 14px;
+            color: var(--text-body);
+        }
+        .coverage-list li:last-child { border-bottom: none; }
+        .region-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .dot-eu { background: var(--accent); }
+        .dot-uk { background: var(--green); }
+        .dot-int { background: #d97706; }
+        .coverage-note {
+            background: var(--surface-alt);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 28px;
+        }
+        .coverage-note h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .coverage-note p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        .coverage-note p:last-child { margin-bottom: 0; }
+        .coverage-stat-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .coverage-stat {
+            text-align: center;
+            padding: 16px 8px;
+            background: var(--surface);
+            border-radius: 6px;
+        }
+        .coverage-stat .val {
+            font-family: var(--mono);
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .coverage-stat .lbl {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* ── PHILOSOPHY — big quote block ── */
+        .philosophy {
+            background: var(--navy-deep);
+            padding: 80px 24px;
+        }
+        .philosophy-inner {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .philosophy-quote {
+            font-size: 28px;
+            font-weight: 400;
+            color: #ffffff;
+            line-height: 1.5;
+            letter-spacing: -0.3px;
+            margin-bottom: 24px;
+        }
+        .philosophy-quote em {
+            color: var(--accent);
+            font-style: normal;
+        }
+        .philosophy-attr {
+            font-size: 14px;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* ── TRUST STRIP ── */
+        .trust-strip {
+            border-bottom: 1px solid var(--border);
+        }
+        .trust-strip-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            display: flex;
+            justify-content: center;
+            gap: 56px;
+            flex-wrap: wrap;
+        }
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .trust-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: var(--green-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .trust-icon svg { width: 14px; height: 14px; fill: var(--green); }
+
+        /* ── CTA ── */
+        .cta-section {
+            text-align: center;
+            padding: 80px 24px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .cta-section h2 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            margin-bottom: 12px;
+        }
+        .cta-section p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 28px;
+            line-height: 1.6;
+        }
+        .cta-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .cta-primary {
+            background: var(--navy);
+            color: #fff;
+        }
+        .cta-primary:hover { background: var(--navy-deep); }
+        .cta-secondary {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .cta-secondary:hover { border-color: var(--accent); color: var(--accent); }
+        .cta-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+        /* ── FOOTER ── */
+        .footer { background: var(--navy); color: white; padding: 60px 24px 30px; }
         .footer-content { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 60px; }
-        .footer h4 { font-size: 18px; margin-bottom: 20px; color: #29ABE2; }
+        .footer h4 { font-size: 18px; margin-bottom: 20px; color: var(--accent); }
         .footer p { color: rgba(255,255,255,0.8); font-size: 15px; line-height: 1.8; }
         .footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 15px; display: block; margin-bottom: 12px; transition: color 0.2s; }
-        .footer a:hover { color: #29ABE2; }
+        .footer a:hover { color: var(--accent); }
         .footer-bottom { max-width: 1200px; margin: 40px auto 0; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; font-size: 14px; color: rgba(255,255,255,0.6); }
+
+        /* ── ANIMATIONS ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .anim { animation: fadeUp 0.5s ease-out both; }
+        .d1 { animation-delay: 0.05s; }
+        .d2 { animation-delay: 0.1s; }
+        .d3 { animation-delay: 0.15s; }
+        .d4 { animation-delay: 0.2s; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 960px) {
+            .opener-inner { grid-template-columns: 1fr; gap: 48px; }
+            .tech-inner { grid-template-columns: 1fr; gap: 40px; }
+            .tech-sidebar { position: static; }
+            .coverage { grid-template-columns: 1fr; gap: 32px; }
+            .process-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+            .process-grid::before { display: none; }
+        }
 
         @media (max-width: 768px) {
             .mobile-menu-btn { display: block; }
             .nav-left, .nav-right { display: none; }
             .header-content { justify-content: space-between; }
             .logo { padding: 0; flex: 1; justify-content: flex-start; }
-            .hero { padding: 50px 20px; }
-            .hero h1 { font-size: 32px; }
-            .container { margin: 0; padding: 0; }
-            .content-card { border-radius: 0; box-shadow: none; padding: 30px 20px; }
-            .stats-grid { grid-template-columns: 1fr; gap: 16px; margin: 30px 0; }
-            .stat-card { padding: 24px 20px; }
-            .stat-number { font-size: 36px; }
-            .values-grid { grid-template-columns: 1fr; gap: 16px; }
-            .value-card { padding: 24px 20px; }
-            .highlight-box { padding: 20px; margin: 20px 0; border-radius: 8px; }
-            .content-card h2 { font-size: 24px; margin-top: 30px; }
-            .footer { margin-top: 40px; padding: 40px 20px 24px; }
+
+            .opener { padding: 60px 24px 48px; }
+            .opener h1 { font-size: 32px; }
+            .opener-desc { font-size: 15px; }
+            .opener-metrics { grid-template-columns: 1fr 1fr; }
+            .metric { padding: 20px; }
+            .metric-value { font-size: 24px; }
+
+            .section { padding: 48px 20px; }
+            .section-title { font-size: 26px; }
+
+            .process-grid { grid-template-columns: 1fr; gap: 24px; }
+            .process-step { text-align: left; padding: 0; display: grid; grid-template-columns: 56px 1fr; gap: 16px; align-items: start; }
+            .process-step .step-num { margin: 0; }
+            .process-step h3, .process-step p { text-align: left; }
+
+            .tech-feature { grid-template-columns: 1fr; gap: 12px; }
+            .tech-feature-icon { width: 40px; height: 40px; }
+
+            .philosophy { padding: 48px 20px; }
+            .philosophy-quote { font-size: 22px; }
+
+            .trust-strip-inner { gap: 24px; flex-direction: column; align-items: center; }
+
+            .coverage-stat-row { grid-template-columns: 1fr; }
+
+            .cta-buttons { flex-direction: column; }
+            .cta-btn { justify-content: center; }
+
+            .footer { padding: 40px 20px 24px; }
             .footer-content { grid-template-columns: 1fr; gap: 32px; }
         }
     </style>
 </head>
 <body>
+
     <header class="header">
         <div class="header-content">
             <nav class="nav-left">
@@ -108,93 +598,222 @@
         </nav>
     </header>
 
-    <section class="hero">
-        <h1>About RVS Logistics</h1>
-        <p>Your trusted freight company for reliable parcel delivery and tracking solutions</p>
+    <!-- ── OPENER ── -->
+    <section class="opener">
+        <div class="opener-inner">
+            <div class="opener-text anim">
+                <div class="opener-tag">Logistics Infrastructure</div>
+                <h1>Shipment visibility built for the <span>modern supply chain</span></h1>
+                <p class="opener-desc">RVS Logistics provides end-to-end parcel tracking infrastructure for e-commerce businesses shipping across Europe and internationally. One platform to monitor, manage, and communicate every delivery.</p>
+            </div>
+            <div class="opener-metrics anim d2">
+                <div class="metric">
+                    <div class="metric-value">10M+</div>
+                    <div class="metric-label">Parcels tracked</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">99.9%</div>
+                    <div class="metric-label">Platform uptime</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">28</div>
+                    <div class="metric-label">Countries covered</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">&lt; 2s</div>
+                    <div class="metric-label">Avg. tracking lookup</div>
+                </div>
+            </div>
+        </div>
     </section>
 
-    <div class="container">
-        <div class="content-card">
-            <h2>Who We Are</h2>
-            <p>RVS Logistics is a professional freight and delivery company, committed to making shipment tracking simple, transparent, and accessible to everyone. Founded in 2020, we've grown to become one of the most trusted names in logistics and parcel delivery across Europe and beyond.</p>
-            <p>Our platform connects customers with their parcels in real-time, providing accurate tracking information and estimated delivery times. With our own fleet of vehicles and dedicated drivers, we ensure complete control over your package from pickup to delivery.</p>
+    <!-- ── CONCEPT STRIP ── -->
+    <div class="concept-strip">
+        <div class="concept-strip-inner">
+            <div class="concept-item">Real-Time Tracking</div>
+            <div class="concept-item">Automated Notifications</div>
+            <div class="concept-item">Multi-Carrier Support</div>
+            <div class="concept-item">E-Commerce Integration</div>
+            <div class="concept-item">Delivery Analytics</div>
+            <div class="concept-item">Custom Branding</div>
+            <div class="concept-item">API Access</div>
+            <div class="concept-item">Global Coverage</div>
+            <!-- duplicate for seamless loop -->
+            <div class="concept-item">Real-Time Tracking</div>
+            <div class="concept-item">Automated Notifications</div>
+            <div class="concept-item">Multi-Carrier Support</div>
+            <div class="concept-item">E-Commerce Integration</div>
+            <div class="concept-item">Delivery Analytics</div>
+            <div class="concept-item">Custom Branding</div>
+            <div class="concept-item">API Access</div>
+            <div class="concept-item">Global Coverage</div>
+        </div>
+    </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">10M+</div>
-                    <div class="stat-label">Parcels Tracked</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">5K+</div>
-                    <div class="stat-label">Daily Users</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">99.9%</div>
-                    <div class="stat-label">Uptime</div>
-                </div>
+    <!-- ── HOW IT WORKS ── -->
+    <div class="section">
+        <div class="process-intro anim">
+            <div class="eyebrow">How it works</div>
+            <h2 class="section-title">From checkout to doorstep, fully automated</h2>
+            <p class="section-desc">Our platform connects directly to your store, generates tracking for every order, and keeps your customers informed at every stage — without any manual work.</p>
+        </div>
+
+        <div class="process-grid anim d1">
+            <div class="process-step">
+                <div class="step-num">01</div>
+                <h3>Order placed</h3>
+                <p>A customer completes a purchase on your connected store</p>
             </div>
+            <div class="process-step">
+                <div class="step-num">02</div>
+                <h3>Shipment created</h3>
+                <p>Our system generates a unique tracking number and shipment record</p>
+            </div>
+            <div class="process-step">
+                <div class="step-num">03</div>
+                <h3>Events generated</h3>
+                <p>Tracking events are created automatically as the parcel moves through the network</p>
+            </div>
+            <div class="process-step">
+                <div class="step-num">04</div>
+                <h3>Delivered</h3>
+                <p>Customer receives their parcel with full tracking history available</p>
+            </div>
+        </div>
+    </div>
 
-            <h2>Our Mission</h2>
-            <p>To provide the most reliable, user-friendly parcel tracking experience, empowering customers and businesses with real-time shipment visibility and peace of mind.</p>
-
-            <h2>Our Values</h2>
-            <div class="values-grid">
-                <div class="value-card">
-                    <div class="value-icon">
-                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    <!-- ── TECHNOLOGY ── -->
+    <div class="tech-section">
+        <div class="tech-inner">
+            <div class="tech-sidebar anim">
+                <div class="eyebrow">Technology</div>
+                <h2 class="section-title">Built for reliability at scale</h2>
+                <p class="section-desc" style="margin-top:12px;">Every component of our infrastructure is designed for speed, accuracy, and uptime — because a missed tracking update means a worried customer.</p>
+            </div>
+            <div class="tech-features anim d2">
+                <div class="tech-feature">
+                    <div class="tech-feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
                     </div>
-                    <h3>Reliability</h3>
-                    <p>We ensure accurate tracking information 24/7, so you can always trust our data.</p>
-                </div>
-                <div class="value-card">
-                    <div class="value-icon">
-                        <svg viewBox="0 0 24 24"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 3.21-1.92 6-4.72 7.28L13 17v5h5l-1.22-1.22C19.91 19.07 22 15.76 22 12c0-5.18-3.95-9.45-9-9.95zM11 2.05C5.94 2.55 2 6.82 2 12c0 3.76 2.09 7.07 5.22 8.78L6 22h5v-5l-2.28 2.28C6.92 18 5 15.21 5 12c0-4.08 3.05-7.44 7-7.93V2.05z"/></svg>
+                    <div>
+                        <h4>Automated event pipeline</h4>
+                        <p>Tracking events are generated and sequenced automatically based on delivery timelines, carrier data, and geographic routing.</p>
                     </div>
-                    <h3>Speed</h3>
-                    <p>Real-time updates mean you're always informed about your parcel's status.</p>
                 </div>
-                <div class="value-card">
-                    <div class="value-icon">
-                        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                    </div>
-                    <h3>Customer Focus</h3>
-                    <p>Your satisfaction is our priority. We're here to help every step of the way.</p>
-                </div>
-                <div class="value-card">
-                    <div class="value-icon">
+                <div class="tech-feature">
+                    <div class="tech-feature-icon">
                         <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
                     </div>
-                    <h3>Sustainability</h3>
-                    <p>We're committed to reducing our environmental impact and promoting green logistics.</p>
+                    <div>
+                        <h4>Multi-region infrastructure</h4>
+                        <p>Deployed across EU and US data centres for low latency regardless of where your customers or stores are located.</p>
+                    </div>
+                </div>
+                <div class="tech-feature">
+                    <div class="tech-feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4s1.82-4 4.03-4h.52l.26-.48C7.89 7.72 9.83 6 12 6c2.76 0 5 2.24 5 5v1h2c1.65 0 3 1.35 3 3s-1.35 3-3 3z"/></svg>
+                    </div>
+                    <div>
+                        <h4>Store integration</h4>
+                        <p>Native connectors for WooCommerce and Shopify. Orders are synced, fulfilled, and tracked without leaving the platform.</p>
+                    </div>
+                </div>
+                <div class="tech-feature">
+                    <div class="tech-feature-icon">
+                        <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                    </div>
+                    <div>
+                        <h4>Secure by default</h4>
+                        <p>All data encrypted in transit and at rest. JWT-based authentication, role-based access control, and full audit logging.</p>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <h2>Why Choose Us</h2>
-            <div class="highlight-box">
-                <div class="highlight-item">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    <p><strong>Real-Time Tracking:</strong> Get instant updates on your parcel's location and status</p>
-                </div>
-                <div class="highlight-item">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    <p><strong>Own Fleet:</strong> We deliver with our own vehicles and trained drivers for maximum reliability</p>
-                </div>
-                <div class="highlight-item">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    <p><strong>Email Notifications:</strong> Receive alerts when your parcel status changes</p>
-                </div>
-                <div class="highlight-item">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    <p><strong>Mobile Friendly:</strong> Track on any device, anywhere, anytime</p>
-                </div>
-                <div class="highlight-item">
-                    <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                    <p><strong>Customer Support:</strong> Our team is ready to help with any questions</p>
+    <!-- ── COVERAGE ── -->
+    <div class="section">
+        <div class="eyebrow anim">Global reach</div>
+        <h2 class="section-title anim">Delivering across borders</h2>
+        <p class="section-desc anim" style="max-width:520px;margin-bottom:40px;">Our logistics network spans the European Union, the United Kingdom, and selected international markets — with new regions added regularly.</p>
+
+        <div class="coverage anim d1">
+            <div>
+                <ul class="coverage-list">
+                    <li><span class="region-dot dot-eu"></span>France, Germany, Netherlands, Belgium, Denmark</li>
+                    <li><span class="region-dot dot-eu"></span>Spain, Portugal, Italy, Austria, Switzerland</li>
+                    <li><span class="region-dot dot-eu"></span>Poland, Czech Republic, Sweden, Finland, Norway</li>
+                    <li><span class="region-dot dot-uk"></span>United Kingdom (England, Scotland, Wales)</li>
+                    <li><span class="region-dot dot-int"></span>Selected international routes on request</li>
+                </ul>
+            </div>
+            <div>
+                <div class="coverage-note">
+                    <h4>Logistics network</h4>
+                    <p>We operate our own fleet alongside trusted regional carriers to ensure reliable last-mile delivery in every market we cover.</p>
+                    <p>Each shipment is routed through optimised corridors with sorting facilities positioned for minimal transit time.</p>
+                    <div class="coverage-stat-row">
+                        <div class="coverage-stat">
+                            <div class="val">28</div>
+                            <div class="lbl">Countries</div>
+                        </div>
+                        <div class="coverage-stat">
+                            <div class="val">3–7</div>
+                            <div class="lbl">Days EU avg.</div>
+                        </div>
+                        <div class="coverage-stat">
+                            <div class="val">5–12</div>
+                            <div class="lbl">Days Int'l avg.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <h2>Contact Us</h2>
-            <p>Have questions or need assistance? We're here to help!<br>Email us at <span id="aboutEmail" style="color: #29ABE2; font-weight: 600;"></span></p>
+    <!-- ── PHILOSOPHY QUOTE ── -->
+    <section class="philosophy">
+        <div class="philosophy-inner anim">
+            <p class="philosophy-quote">"Logistics transparency shouldn't be a luxury. Every person who orders a package online deserves to know <em>exactly</em> where it is and <em>exactly</em> when it will arrive."</p>
+            <p class="philosophy-attr">— RVS Logistics, founding principle</p>
+        </div>
+    </section>
+
+    <!-- ── TRUST STRIP ── -->
+    <div class="trust-strip">
+        <div class="trust-strip-inner">
+            <div class="trust-item">
+                <div class="trust-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+                99.9% uptime SLA
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+                GDPR compliant
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+                Human support team
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+                Encrypted tracking data
+            </div>
+        </div>
+    </div>
+
+    <!-- ── CTA ── -->
+    <div class="cta-section anim">
+        <h2>Ready to track a shipment?</h2>
+        <p>Enter your tracking number to see real-time status, or reach out to our team if you need assistance with a delivery.</p>
+        <div class="cta-buttons">
+            <a href="index.html" class="cta-btn cta-primary">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                Track a shipment
+            </a>
+            <a href="contact.html" class="cta-btn cta-secondary">
+                <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                Contact support
+            </a>
         </div>
     </div>
 
@@ -202,7 +821,7 @@
         <div class="footer-content">
             <div>
                 <h4>RVS Logistics</h4>
-                <p>Professional freight and delivery company serving businesses and individuals. Our own fleet ensures reliable service, delivered with excellence.</p>
+                <p>Professional parcel tracking solutions for businesses and individuals. Real-time updates, reliable service, delivered with excellence.</p>
             </div>
             <div>
                 <h4>Quick Links</h4>
@@ -214,22 +833,20 @@
             <div>
                 <h4>Contact</h4>
                 <p id="footerEmail"></p>
-                <p>Mon-Fri: 8:00-17:00</p>
+                <p>Mon-Fri: 9:00-17:00 CET</p>
             </div>
         </div>
         <div class="footer-bottom">© 2026 RVS Logistics. All rights reserved.</div>
     </footer>
 
     <script>
-        var user = 'support';
-        var domain = 'rvslogistics.com';
-        var email = user + '@' + domain;
-        document.getElementById('aboutEmail').innerHTML = '<a href="mai' + 'lto:' + email + '" style="color: #29ABE2; font-weight: 600;">' + email + '</a>';
-        document.getElementById('footerEmail').textContent = email;
+        var u = 'support', d = 'rvslogistics.com', e = u + '@' + d;
+        document.getElementById('footerEmail').textContent = e;
 
         function toggleMobileMenu() {
             document.getElementById('mobileNav').classList.toggle('show');
         }
     </script>
+
 </body>
 </html>
