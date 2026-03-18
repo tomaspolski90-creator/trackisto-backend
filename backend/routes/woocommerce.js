@@ -12,7 +12,6 @@ const authMiddleware = (req, res, next) => {
 // WOOCOMMERCE API HELPER FUNCTIONS
 // ============================================
 
-// ✅ ÆNDRET: Fjernet consumer_key/secret fra URL - bruges nu kun til base URL
 function buildWooCommerceUrl(store, endpoint) {
   let domain = store.domain
     .replace(/^https?:\/\//, '')
@@ -20,7 +19,6 @@ function buildWooCommerceUrl(store, endpoint) {
   return `https://${domain}/wp-json/wc/v3/${endpoint}`;
 }
 
-// ✅ NY FUNKTION: Basic Auth header i stedet for credentials i URL
 function getAuthHeaders(store) {
   const credentials = Buffer.from(`${store.client_id}:${store.client_secret}`).toString('base64');
   return {
@@ -31,41 +29,54 @@ function getAuthHeaders(store) {
   };
 }
 
+// ============================================
+// FIX 1: Understøtter nu flere statusser via kommasepareret string
+// FIX: Henter ALLE sider (WooCommerce paginerer med max 100 per side)
+// ============================================
 async function fetchWooCommerceOrders(store, status = 'processing') {
   try {
-    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
     const baseUrl = buildWooCommerceUrl(store, 'orders');
-    const fullUrl = `${baseUrl}?status=${status}&per_page=50`;
+    let allOrders = [];
+    let page = 1;
+    const perPage = 100;
 
     console.log(`[WooCommerce] Fetching orders from ${store.domain} with status: ${status}`);
 
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers: getAuthHeaders(store)
-    });
+    while (true) {
+      const fullUrl = `${baseUrl}?status=${status}&per_page=${perPage}&page=${page}`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 500)}`);
-      return [];
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: getAuthHeaders(store)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[WooCommerce] Error fetching orders: ${response.status} - ${errorText.substring(0, 500)}`);
+        return allOrders; // Return what we have so far
+      }
+
+      const responseText = await response.text();
+
+      if (responseText.trim().startsWith('<')) {
+        console.error(`[WooCommerce] Received HTML instead of JSON from ${store.domain}`);
+        return allOrders;
+      }
+
+      try {
+        const orders = JSON.parse(responseText);
+        if (orders.length === 0) break; // No more pages
+        allOrders = [...allOrders, ...orders];
+        if (orders.length < perPage) break; // Last page
+        page++;
+      } catch (parseError) {
+        console.error(`[WooCommerce] JSON parse error: ${parseError.message}`);
+        return allOrders;
+      }
     }
 
-    const responseText = await response.text();
-
-    if (responseText.trim().startsWith('<')) {
-      console.error(`[WooCommerce] Received HTML instead of JSON from ${store.domain}`);
-      console.error(`[WooCommerce] HTML content: ${responseText.substring(0, 500)}`);
-      return [];
-    }
-
-    try {
-      const orders = JSON.parse(responseText);
-      console.log(`[WooCommerce] Found ${orders.length} orders with status ${status}`);
-      return orders;
-    } catch (parseError) {
-      console.error(`[WooCommerce] JSON parse error: ${parseError.message}`);
-      return [];
-    }
+    console.log(`[WooCommerce] Found ${allOrders.length} orders with status ${status}`);
+    return allOrders;
   } catch (error) {
     console.error(`[WooCommerce] Error fetching orders from ${store.domain}:`, error.message);
     return [];
@@ -74,7 +85,6 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
 
 async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUrl) {
   try {
-    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
     const url = buildWooCommerceUrl(store, `orders/${orderId}`);
 
     const response = await fetch(url, {
@@ -94,7 +104,9 @@ async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUr
       throw new Error(`Failed to update order: ${response.status} - ${errorText}`);
     }
 
-    // ✅ ÆNDRET: credentials sendes som header, ikke i URL
+    // Parse the response BEFORE making the notes request
+    const orderData = await response.json();
+
     const noteUrl = buildWooCommerceUrl(store, `orders/${orderId}/notes`);
     await fetch(noteUrl, {
       method: 'POST',
@@ -106,7 +118,7 @@ async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUr
     });
 
     console.log(`[WooCommerce] Updated order ${orderId} with tracking ${trackingNumber}`);
-    return await response.json();
+    return orderData;
   } catch (error) {
     console.error(`[WooCommerce] Error updating order ${orderId}:`, error.message);
     throw error;
@@ -299,31 +311,162 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
     let allOrders = [];
     
     for (const store of stores) {
-      const orders = await fetchWooCommerceOrders(store, 'processing');
+      // ============================================
+      // FIX 2: Henter OGSÅ completed orders, ikke kun processing
+      // WooCommerce API understøtter kommaseparerede statusser
+      // ============================================
+      const orders = await fetchWooCommerceOrders(store, 'processing,completed');
       
-      const mappedOrders = orders.map(order => ({
-        id: order.id,
-        order_number: order.number || order.id,
-        customer_name: `${order.shipping?.first_name || order.billing?.first_name || ''} ${order.shipping?.last_name || order.billing?.last_name || ''}`.trim() || 'Unknown',
-        country: order.shipping?.country || order.billing?.country || 'Unknown',
-        total_price: order.total,
-        currency: order.currency,
-        created_at: order.date_created,
-        fulfillment_status: 'unfulfilled',
-        store_domain: store.domain,
-        store_id: store.id,
-        store_type: 'woocommerce'
-      }));
-      
-      allOrders = [...allOrders, ...mappedOrders];
+      for (const order of orders) {
+        // Tjek om ordren allerede har et shipment-record i vores DB
+        const existingShipment = await db.query(
+          'SELECT id FROM shipments WHERE shopify_order_id = $1',
+          [order.id.toString()]
+        );
+        
+        const hasShipment = existingShipment.rows.length > 0;
+        
+        // Map WooCommerce status til Trackisto fulfillment status
+        let fulfillmentStatus;
+        if (hasShipment) {
+          fulfillmentStatus = 'fulfilled'; // Allerede i vores system
+        } else if (order.status === 'completed') {
+          fulfillmentStatus = 'completed_not_synced'; // Completed i WC men mangler shipment
+        } else {
+          fulfillmentStatus = 'unfulfilled'; // Processing, klar til fulfill
+        }
+        
+        allOrders.push({
+          id: order.id,
+          order_number: order.number || order.id,
+          customer_name: `${order.shipping?.first_name || order.billing?.first_name || ''} ${order.shipping?.last_name || order.billing?.last_name || ''}`.trim() || 'Unknown',
+          country: order.shipping?.country || order.billing?.country || 'Unknown',
+          total_price: order.total,
+          currency: order.currency,
+          created_at: order.date_created,
+          fulfillment_status: fulfillmentStatus,
+          wc_status: order.status, // Original WooCommerce status
+          store_domain: store.domain,
+          store_id: store.id,
+          store_type: 'woocommerce',
+          has_shipment: hasShipment
+        });
+      }
     }
     
     allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    console.log(`[WooCommerce] Total pending orders: ${allOrders.length}`);
+    console.log(`[WooCommerce] Total orders: ${allOrders.length}`);
     res.json({ orders: allOrders });
   } catch (error) {
     console.error('[WooCommerce] Error:', error);
     res.status(500).json({ error: 'Failed to fetch pending orders' });
+  }
+});
+
+// ============================================
+// FIX 3: NY ENDPOINT - Sync completed WooCommerce orders
+// som mangler shipment records i Trackisto
+// ============================================
+router.post('/sync-completed', authMiddleware, async (req, res) => {
+  console.log('[WooCommerce Sync] Syncing completed orders...');
+  
+  try {
+    const storesResult = await db.query(
+      "SELECT * FROM shopify_stores WHERE status = $1 AND store_type = 'woocommerce' AND is_connected = true",
+      ['active']
+    );
+    
+    let syncedCount = 0;
+    let errors = [];
+    
+    for (const store of storesResult.rows) {
+      console.log(`[WooCommerce Sync] Processing store: ${store.domain}`);
+      
+      // Hent COMPLETED orders fra WooCommerce
+      const completedOrders = await fetchWooCommerceOrders(store, 'completed');
+      console.log(`[WooCommerce Sync] Found ${completedOrders.length} completed orders in WC`);
+      
+      for (const order of completedOrders) {
+        // Tjek om vi allerede har et shipment record
+        const existing = await db.query(
+          'SELECT id FROM shipments WHERE shopify_order_id = $1',
+          [order.id.toString()]
+        );
+        
+        if (existing.rows.length > 0) {
+          continue; // Allerede synkroniseret
+        }
+        
+        // Ordren er completed i WC men mangler shipment record - opret det nu
+        const address = order.shipping?.address_1 ? order.shipping : order.billing;
+        if (!address || !address.first_name) {
+          console.log(`[WooCommerce Sync] Skipping order ${order.id} - no address`);
+          continue;
+        }
+        
+        try {
+          // Tjek om ordren allerede har tracking info fra WC meta_data
+          const existingTracking = order.meta_data?.find(m => m.key === '_tracking_number');
+          const countryCode = (address.country || 'XX').toUpperCase();
+          const trackingNumber = existingTracking?.value || (countryCode + Date.now() + Math.floor(Math.random() * 1000));
+          
+          const shipmentResult = await db.query(`
+            INSERT INTO shipments (
+              tracking_number, customer_name, customer_email, shipping_address,
+              city, state, zip_code, country, origin_country, destination_country,
+              status, delivery_days, sorting_days, estimated_delivery, price,
+              shopify_order_id, shopify_store_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+            RETURNING id
+          `, [
+            trackingNumber,
+            `${address.first_name || ''} ${address.last_name || ''}`.trim(),
+            order.billing?.email || '',
+            `${address.address_1 || ''} ${address.address_2 || ''}`.trim(),
+            address.city || '',
+            address.state || '',
+            address.postcode || '',
+            address.country || '',
+            store.country_origin || 'United Kingdom',
+            address.country || '',
+            'label_created',
+            store.delivery_days || 7,
+            store.sorting_days || 3,
+            new Date(Date.now() + (store.delivery_days || 7) * 24 * 60 * 60 * 1000),
+            parseFloat(order.total) || 0,
+            order.id.toString(),
+            store.id
+          ]);
+          
+          await db.query(`
+            INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
+            VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_TIME, NOW())
+          `, [
+            shipmentResult.rows[0].id,
+            'Label Created',
+            store.country_origin || 'United Kingdom',
+            `Synced from WooCommerce completed order #${order.id}`
+          ]);
+          
+          console.log(`[WooCommerce Sync] Created shipment for completed order ${order.id} → ${trackingNumber}`);
+          syncedCount++;
+        } catch (orderError) {
+          console.error(`[WooCommerce Sync] Error syncing order ${order.id}:`, orderError);
+          errors.push({ order_id: order.id, error: orderError.message });
+        }
+      }
+    }
+    
+    console.log(`[WooCommerce Sync] Completed. Synced ${syncedCount} orders.`);
+    res.json({
+      success: true,
+      message: `Synced ${syncedCount} completed WooCommerce orders`,
+      synced: syncedCount,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[WooCommerce Sync] Error:', error);
+    res.status(500).json({ error: 'Failed to sync completed orders', details: error.message });
   }
 });
 
@@ -345,7 +488,12 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
     
     for (const store of storesResult.rows) {
       console.log(`[WooCommerce Fetch-Fulfill] Processing store: ${store.domain}`);
-      const allOrders = await fetchWooCommerceOrders(store, 'processing');
+      
+      // ============================================
+      // FIX 4: Henter OGSÅ completed orders der mangler shipment records
+      // Så ordrer der blev completed men ikke synkroniseret, kan indhentes
+      // ============================================
+      const allOrders = await fetchWooCommerceOrders(store, 'processing,completed');
       
       const orders = orderIds && orderIds.length > 0
         ? allOrders.filter(o => orderIds.includes(o.id))
@@ -376,10 +524,14 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
           const trackingNumber = countryCode + Date.now() + Math.floor(Math.random() * 1000);
           const trackingUrl = `https://rvslogistics.com/?tracking=${trackingNumber}`;
           
-          console.log(`[WooCommerce Fetch-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (country: ${countryCode})`);
+          console.log(`[WooCommerce Fetch-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (country: ${countryCode}, wc_status: ${order.status})`);
           
-          await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
-          
+          // ============================================
+          // FIX 5: OMVENDT RÆKKEFØLGE
+          // Opret shipment record FØRST, derefter opdater WooCommerce
+          // Hvis DB-insert fejler, er ordren stadig "processing" i WC
+          // og kan forsøges igen
+          // ============================================
           const shipmentResult = await db.query(`
             INSERT INTO shipments (
               tracking_number, customer_name, customer_email, shipping_address,
@@ -418,6 +570,20 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
             `Label created in ${store.country_origin || 'United Kingdom'}`
           ]);
           
+          // Nu opdater WooCommerce EFTER DB-insert lykkedes
+          // Kun hvis ordren ikke allerede er completed i WC
+          if (order.status !== 'completed') {
+            try {
+              await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
+            } catch (wcError) {
+              // WC-opdatering fejlede, men shipment-record ER oprettet
+              // Log fejlen men marker IKKE som fejlet - ordren er gemt lokalt
+              console.warn(`[WooCommerce Fetch-Fulfill] WC update failed for order ${order.id}, but shipment was created locally: ${wcError.message}`);
+            }
+          } else {
+            console.log(`[WooCommerce Fetch-Fulfill] Order ${order.id} already completed in WC, skipping WC update`);
+          }
+          
           console.log(`[WooCommerce Fetch-Fulfill] Saved shipment ${trackingNumber}`);
           fulfilledCount++;
         } catch (orderError) {
@@ -452,7 +618,6 @@ router.post('/test-connection', authMiddleware, async (req, res) => {
     domain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
     
     const store = { domain, client_id, client_secret };
-    // ✅ ÆNDRET: Basic Auth header i stedet for URL params
     const url = buildWooCommerceUrl(store, 'system_status');
     
     const response = await fetch(url, {
@@ -510,8 +675,11 @@ async function processWooCommerceAutoFulfillment() {
       if (diff <= 15) {
         console.log(`[WooCommerce Auto-Fulfill] Processing store ${store.domain} (target: ${fulfillmentTime})`);
         
-        const orders = await fetchWooCommerceOrders(store, 'processing');
-        console.log(`[WooCommerce Auto-Fulfill] Found ${orders.length} processing orders`);
+        // ============================================
+        // FIX 6: Henter OGSÅ completed orders der mangler shipment records
+        // ============================================
+        const orders = await fetchWooCommerceOrders(store, 'processing,completed');
+        console.log(`[WooCommerce Auto-Fulfill] Found ${orders.length} orders (processing + completed)`);
 
         for (const order of orders) {
           const existing = await db.query(
@@ -520,8 +688,7 @@ async function processWooCommerceAutoFulfillment() {
           );
           
           if (existing.rows.length > 0) {
-            console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - already processed`);
-            continue;
+            continue; // Already processed
           }
 
           const sendOffset = store.send_offset || 0;
@@ -547,10 +714,11 @@ async function processWooCommerceAutoFulfillment() {
             const trackingNumber = countryCode + Date.now() + Math.floor(Math.random() * 1000);
             const trackingUrl = `https://rvslogistics.com/?tracking=${trackingNumber}`;
             
-            console.log(`[WooCommerce Auto-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (country: ${countryCode})`);
+            console.log(`[WooCommerce Auto-Fulfill] Fulfilling order ${order.id} with tracking ${trackingNumber} (wc_status: ${order.status})`);
             
-            await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
-            
+            // ============================================
+            // FIX 7: DB-INSERT FØRST, derefter WooCommerce update
+            // ============================================
             const shipmentResult = await db.query(`
               INSERT INTO shipments (
                 tracking_number, customer_name, customer_email, shipping_address,
@@ -588,6 +756,15 @@ async function processWooCommerceAutoFulfillment() {
               store.country_origin || 'United Kingdom',
               `Label created in ${store.country_origin || 'United Kingdom'}`
             ]);
+            
+            // WooCommerce update EFTER DB-insert - kun hvis ikke allerede completed
+            if (order.status !== 'completed') {
+              try {
+                await updateWooCommerceOrder(store, order.id, trackingNumber, trackingUrl);
+              } catch (wcError) {
+                console.warn(`[WooCommerce Auto-Fulfill] WC update failed for order ${order.id}, but shipment was saved locally: ${wcError.message}`);
+              }
+            }
             
             console.log(`[WooCommerce Auto-Fulfill] Saved shipment ${trackingNumber}`);
           } catch (orderError) {
