@@ -539,7 +539,8 @@ async function updateTrackingEvents() {
              ss.parcel_point_days,
              ss.redelivery_active,
              ss.redelivery_days,
-             ss.attempts
+             ss.attempts,
+             ss.store_type
       FROM shipments s
       LEFT JOIN shopify_stores ss ON s.shopify_store_id = ss.id
       WHERE s.status != 'delivered'
@@ -576,6 +577,7 @@ async function updateShipmentEvents(shipment) {
   const destinationCity = shipment.city || 'Local';
   const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 15;
   const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
+  const isWooCommerce = shipment.store_type === 'woocommerce';
   
   const getCountryCode = (country) => {
     const codes = {
@@ -728,15 +730,17 @@ async function updateShipmentEvents(shipment) {
     },
     { 
       day: Math.round(dayStep * 17), 
-      status: 'Out for Delivery', 
+      status: isWooCommerce ? 'Shipment Damaged – Inspection Hold' : 'Out for Delivery', 
       location: `${destinationCity}, ${destinationCountry}`,
-      description: `Out for delivery in destination area (${destinationCountry}).`,
+      description: isWooCommerce 
+        ? `During routine inspection at the local depot, the package was found to be damaged and cannot be dispatched for delivery. Please contact the sender for further assistance.`
+        : `Out for delivery in destination area (${destinationCountry}).`,
       priority: 18
     }
   ];
   
-  // Add parcel point event if enabled
-  if (parcelPoint) {
+  // Add parcel point event if enabled (only for non-WooCommerce — WC shipments end at damage hold)
+  if (parcelPoint && !isWooCommerce) {
     eventSchedule.push({
       day: Math.round(dayStep * 18),
       status: 'Available at Parcel Point',
@@ -789,8 +793,9 @@ async function updateShipmentEvents(shipment) {
   let newStatus = 'label_created';
   
   if (highestPriority >= 18) {
-    // Out for Delivery or Available at Parcel Point
-    newStatus = 'out_for_delivery';
+    // WooCommerce: shipment damaged at local depot — delivery halted
+    // Shopify: Out for Delivery or Available at Parcel Point
+    newStatus = isWooCommerce ? 'exception' : 'out_for_delivery';
   } else if (highestPriority >= 11) {
     // Arrived in destination country through local delivery
     newStatus = 'in_transit';
