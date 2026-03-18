@@ -549,8 +549,10 @@
             .section-title { font-size: 26px; }
 
             .process-grid { grid-template-columns: 1fr; gap: 24px; }
-            .process-step { text-align: left; padding: 0; display: grid; grid-template-columns: 56px 1fr; gap: 16px; align-items: start; }
-            .process-step .step-num { margin: 0; }
+            .process-step { text-align: left; padding: 0; display: grid; grid-template-columns: 56px 1fr; gap: 4px 16px; align-items: start; }
+            .process-step .step-num { margin: 0; grid-row: 1 / 3; }
+            .process-step h3 { grid-column: 2; }
+            .process-step p { grid-column: 2; }
             .process-step h3, .process-step p { text-align: left; }
 
             .tech-feature { grid-template-columns: 1fr; gap: 12px; }
