@@ -126,7 +126,11 @@ function App() {
       }
       if (wooRes.ok) {
         const data = await wooRes.json();
-        allOrders = [...allOrders, ...(data.orders || []).map(o => ({...o, store_type: 'woocommerce', store_name: o.store_name || o.store_domain}))];
+        // FIX: Filtrer fulfilled orders fra - vis kun ordrer der IKKE allerede har shipment
+        const wooOrders = (data.orders || [])
+          .filter(o => !o.has_shipment)
+          .map(o => ({...o, store_type: 'woocommerce', store_name: o.store_name || o.store_domain}));
+        allOrders = [...allOrders, ...wooOrders];
       }
       
       allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -150,6 +154,29 @@ function App() {
         setFulfilledOrders(orders);
       }
     } catch (error) { console.error('Error fetching fulfilled orders:', error); }
+    setPendingLoading(false);
+  };
+
+  // FIX: Ny funktion til at synkronisere completed WC-ordrer der mangler shipment records
+  const syncCompletedOrders = async () => {
+    if (!window.confirm('This will sync all completed WooCommerce orders that are missing shipment records. Continue?')) return;
+    setPendingLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/woocommerce/sync-completed`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ ${data.message}`);
+        fetchDashboardData();
+        fetchPendingOrders();
+        fetchFulfilledOrders();
+      } else {
+        const data = await response.json();
+        alert('Sync failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) { alert('Sync error: ' + error.message); }
     setPendingLoading(false);
   };
 
@@ -614,6 +641,7 @@ function App() {
               )}
               
               <button className="refresh-btn" onClick={() => { fetchPendingOrders(); fetchFulfilledOrders(); setSelectedOrders([]); }} disabled={pendingLoading}>🔄 Refresh</button>
+              <button className="refresh-btn" onClick={syncCompletedOrders} disabled={pendingLoading} title="Sync completed WooCommerce orders missing from Trackisto">🔗 Sync WC</button>
               {dashboardTab === 'pending' && (
                 <button className="fetch-btn" onClick={fetchAndFulfillOrders} disabled={pendingLoading}>
                   <span className="fetch-icon">⬇</span>
@@ -691,7 +719,7 @@ function App() {
                             <td>{order.customer_name}</td>
                             <td>{order.country}</td>
                             <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
-                            <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐' : '🛒'} {order.store_name || order.store_domain}</span></td>
+                            <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐' : '🛒'} {order.store_name || order.store_domain}</span>{order.wc_status === 'completed' && <span className="status completed" style={{marginLeft: '4px', fontSize: '10px'}}>WC:completed</span>}</td>
                             <td>{new Date(order.created_at).toLocaleDateString()}</td>
                           </tr>
                         ))}
