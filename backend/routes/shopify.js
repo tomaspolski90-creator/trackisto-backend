@@ -592,6 +592,36 @@ async function updateShipmentEvents(shipment) {
   const transitCode = getCountryCode(transitCountry);
   const destCode = getCountryCode(destinationCountry);
   
+  // Map origin country to realistic origin city and export hub
+  const getOriginCity = (country) => {
+    const cities = {
+      'United Kingdom': 'London', 'Germany': 'Berlin', 'Denmark': 'Copenhagen',
+      'Netherlands': 'Amsterdam', 'France': 'Paris', 'Belgium': 'Brussels',
+      'Italy': 'Milan', 'Spain': 'Madrid', 'Poland': 'Warsaw', 'Sweden': 'Stockholm',
+      'Norway': 'Oslo', 'Austria': 'Vienna', 'Switzerland': 'Zurich', 'Ireland': 'Dublin',
+      'Portugal': 'Lisbon', 'Czech Republic': 'Prague', 'Finland': 'Helsinki',
+      'Greece': 'Athens', 'Hungary': 'Budapest', 'Romania': 'Bucharest',
+      'United States': 'New York', 'Canada': 'Toronto'
+    };
+    return cities[country] || country;
+  };
+  
+  const getExportHub = (country) => {
+    const hubs = {
+      'United Kingdom': 'Felixstowe', 'Germany': 'Hamburg', 'Denmark': 'Aarhus',
+      'Netherlands': 'Rotterdam', 'France': 'Le Havre', 'Belgium': 'Antwerp',
+      'Italy': 'Genoa', 'Spain': 'Barcelona', 'Poland': 'Gdansk', 'Sweden': 'Gothenburg',
+      'Norway': 'Bergen', 'Austria': 'Linz', 'Switzerland': 'Basel', 'Ireland': 'Cork',
+      'Portugal': 'Porto', 'Czech Republic': 'Brno', 'Finland': 'Turku',
+      'Greece': 'Piraeus', 'Hungary': 'Debrecen', 'Romania': 'Constanta',
+      'United States': 'Newark', 'Canada': 'Montreal'
+    };
+    return hubs[country] || country;
+  };
+  
+  const originCity2 = getOriginCity(originCountry);
+  const exportHub = getExportHub(originCountry);
+  
   // Calculate day intervals - spread 18 events across delivery period
   const dayStep = deliveryDays / 18;
   
@@ -600,63 +630,63 @@ async function updateShipmentEvents(shipment) {
   // 6-9: Export & Transit (through Netherlands)
   // 10-18: Destination country (UK) including customs
   const eventSchedule = [
-    // ===== ORIGIN COUNTRY (Germany) - Days 0-4 =====
+    // ===== ORIGIN COUNTRY - Days 0-4 =====
     { 
       day: 0, 
       status: 'Label Created', 
-      location: `Berlin, ${originCountry}`,
-      description: `Shipment information received. Label created in Berlin, ${originCountry}.`,
+      location: `${originCity2}, ${originCountry}`,
+      description: `Shipment information received. Label created in ${originCity2}, ${originCountry}.`,
       priority: 1
     },
     { 
       day: Math.round(dayStep * 1), 
       status: 'Package Received', 
-      location: `Origin Facility, Berlin (${originCode})`,
-      description: `Parcel received and scanned at origin facility, Berlin (${originCode}).`,
+      location: `Origin Facility, ${originCity2} (${originCode})`,
+      description: `Parcel received and scanned at origin facility, ${originCity2} (${originCode}).`,
       priority: 2
     },
     { 
       day: Math.round(dayStep * 2), 
       status: 'Processed at Origin Hub', 
-      location: `Berlin Origin Hub`,
-      description: `Processed through Berlin Origin Hub (sorting & outbound preparation).`,
+      location: `${originCity2} Origin Hub`,
+      description: `Processed through ${originCity2} Origin Hub (sorting & outbound preparation).`,
       priority: 3
     },
     { 
       day: Math.round(dayStep * 3), 
       status: 'Departed Origin Facility', 
-      location: `Berlin (${originCode}) Origin Hub`,
-      description: `Departed Berlin (${originCode}) Origin Hub — linehaul to Hamburg Export Hub.`,
+      location: `${originCity2} (${originCode}) Origin Hub`,
+      description: `Departed ${originCity2} (${originCode}) Origin Hub — linehaul to ${exportHub} Export Hub.`,
       priority: 4
     },
     { 
       day: Math.round(dayStep * 4), 
-      status: 'In Transit to Hamburg', 
+      status: `In Transit to ${exportHub}`, 
       location: `${originCountry}`,
-      description: `In transit by road to Hamburg (${originCode}).`,
+      description: `In transit by road to ${exportHub} (${originCode}).`,
       priority: 5
     },
     
-    // ===== EXPORT HUB (Hamburg, Germany) - Days 5-6 =====
+    // ===== EXPORT HUB - Days 5-6 =====
     { 
       day: Math.round(dayStep * 5), 
       status: 'Arrived at Export Hub', 
-      location: `Hamburg Export Hub (${originCode})`,
-      description: `Arrived at Hamburg Export Hub (${originCode}) — export processing initiated.`,
+      location: `${exportHub} Export Hub (${originCode})`,
+      description: `Arrived at ${exportHub} Export Hub (${originCode}) — export processing initiated.`,
       priority: 6
     },
     { 
       day: Math.round(dayStep * 6), 
       status: 'Export Documentation Check', 
-      location: `Hamburg Export Hub (${originCode})`,
+      location: `${exportHub} Export Hub (${originCode})`,
       description: `Export documentation verification and security screening completed.`,
       priority: 7
     },
     { 
       day: Math.round(dayStep * 7), 
       status: 'Departed Export Hub', 
-      location: `Hamburg (${originCode})`,
-      description: `Departed Hamburg (${originCode}) — cross-border linehaul to port facility.`,
+      location: `${exportHub} (${originCode})`,
+      description: `Departed ${exportHub} (${originCode}) — cross-border linehaul to port facility.`,
       priority: 8
     },
     
@@ -818,6 +848,130 @@ router.post('/update-tracking-events', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('[Update Events] Error:', error);
     res.status(500).json({ error: 'Failed to update tracking events' });
+  }
+});
+
+// ============================================
+// FIX EXISTING TRACKING EVENTS — replace wrong Berlin/Hamburg with correct cities
+// Call this once to migrate all existing shipments
+// ============================================
+router.post('/fix-tracking-cities', authMiddleware, async (req, res) => {
+  console.log('[Fix Cities] Starting migration of tracking event cities...');
+  
+  const cityMap = {
+    'United Kingdom': 'London', 'Germany': 'Berlin', 'Denmark': 'Copenhagen',
+    'Netherlands': 'Amsterdam', 'France': 'Paris', 'Belgium': 'Brussels',
+    'Italy': 'Milan', 'Spain': 'Madrid', 'Poland': 'Warsaw', 'Sweden': 'Stockholm',
+    'Norway': 'Oslo', 'Austria': 'Vienna', 'Switzerland': 'Zurich', 'Ireland': 'Dublin',
+    'Portugal': 'Lisbon', 'Czech Republic': 'Prague', 'Finland': 'Helsinki',
+    'Greece': 'Athens', 'Hungary': 'Budapest', 'Romania': 'Bucharest',
+    'United States': 'New York', 'Canada': 'Toronto'
+  };
+  
+  const hubMap = {
+    'United Kingdom': 'Felixstowe', 'Germany': 'Hamburg', 'Denmark': 'Aarhus',
+    'Netherlands': 'Rotterdam', 'France': 'Le Havre', 'Belgium': 'Antwerp',
+    'Italy': 'Genoa', 'Spain': 'Barcelona', 'Poland': 'Gdansk', 'Sweden': 'Gothenburg',
+    'Norway': 'Bergen', 'Austria': 'Linz', 'Switzerland': 'Basel', 'Ireland': 'Cork',
+    'Portugal': 'Porto', 'Czech Republic': 'Brno', 'Finland': 'Turku',
+    'Greece': 'Piraeus', 'Hungary': 'Debrecen', 'Romania': 'Constanta',
+    'United States': 'Newark', 'Canada': 'Montreal'
+  };
+  
+  const getCode = (country) => {
+    const codes = {
+      'United Kingdom': 'UK', 'Germany': 'DE', 'Denmark': 'DK', 'Netherlands': 'NL',
+      'France': 'FR', 'Sweden': 'SE', 'Norway': 'NO', 'Belgium': 'BE', 'Italy': 'IT',
+      'Spain': 'ES', 'Poland': 'PL', 'Austria': 'AT', 'Switzerland': 'CH',
+      'Ireland': 'IE', 'Portugal': 'PT', 'Czech Republic': 'CZ', 'Finland': 'FI',
+      'Greece': 'GR', 'Hungary': 'HU', 'Romania': 'RO', 'United States': 'US', 'Canada': 'CA'
+    };
+    return codes[country] || country.substring(0, 2).toUpperCase();
+  };
+  
+  try {
+    // Get all shipments with their store's origin country
+    const shipmentsResult = await db.query(`
+      SELECT s.id, s.tracking_number, 
+             COALESCE(s.origin_country, ss.country_origin, 'United Kingdom') as origin_country
+      FROM shipments s
+      LEFT JOIN shopify_stores ss ON s.shopify_store_id = ss.id
+    `);
+    
+    let fixedCount = 0;
+    let skippedCount = 0;
+    
+    for (const shipment of shipmentsResult.rows) {
+      const origin = shipment.origin_country;
+      const correctCity = cityMap[origin] || origin;
+      const correctHub = hubMap[origin] || origin;
+      const code = getCode(origin);
+      
+      // Skip if origin is Germany (Berlin/Hamburg are already correct)
+      if (origin === 'Germany') {
+        skippedCount++;
+        continue;
+      }
+      
+      // Get all tracking events for this shipment
+      const eventsResult = await db.query(
+        'SELECT id, status, location, description FROM tracking_events WHERE shipment_id = $1',
+        [shipment.id]
+      );
+      
+      for (const event of eventsResult.rows) {
+        let newLocation = event.location;
+        let newDescription = event.description;
+        let newStatus = event.status;
+        let changed = false;
+        
+        // Replace Berlin references
+        if (newLocation && newLocation.includes('Berlin')) {
+          newLocation = newLocation.replace(/Berlin/g, correctCity);
+          changed = true;
+        }
+        if (newDescription && newDescription.includes('Berlin')) {
+          newDescription = newDescription.replace(/Berlin/g, correctCity);
+          changed = true;
+        }
+        
+        // Replace Hamburg references
+        if (newLocation && newLocation.includes('Hamburg')) {
+          newLocation = newLocation.replace(/Hamburg/g, correctHub);
+          changed = true;
+        }
+        if (newDescription && newDescription.includes('Hamburg')) {
+          newDescription = newDescription.replace(/Hamburg/g, correctHub);
+          changed = true;
+        }
+        
+        // Fix the "In Transit to Hamburg" status
+        if (newStatus === 'In Transit to Hamburg') {
+          newStatus = `In Transit to ${correctHub}`;
+          changed = true;
+        }
+        
+        if (changed) {
+          await db.query(
+            'UPDATE tracking_events SET status = $1, location = $2, description = $3 WHERE id = $4',
+            [newStatus, newLocation, newDescription, event.id]
+          );
+        }
+      }
+      
+      fixedCount++;
+    }
+    
+    console.log(`[Fix Cities] Done. Fixed ${fixedCount} shipments, skipped ${skippedCount} (already correct).`);
+    res.json({
+      success: true,
+      message: `Fixed tracking cities for ${fixedCount} shipments (${skippedCount} already correct)`,
+      fixed: fixedCount,
+      skipped: skippedCount
+    });
+  } catch (error) {
+    console.error('[Fix Cities] Error:', error);
+    res.status(500).json({ error: 'Failed to fix tracking cities', details: error.message });
   }
 });
 
