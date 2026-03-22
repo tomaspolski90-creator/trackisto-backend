@@ -265,6 +265,25 @@ function App() {
     }
   };
 
+  const skipOrder = async (order) => {
+    if (!window.confirm(`Skip order #${order.order_number} from ${order.customer_name}?\n\nThis order will NOT be fulfilled and the customer will NOT receive tracking.`)) return;
+    try {
+      const response = await fetch(`${API_URL}/api/woocommerce/skip-order`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.id, customer_name: order.customer_name, store_type: order.store_type || 'woocommerce' })
+      });
+      if (response.ok) {
+        setPendingOrders(prev => prev.filter(o => !(o.id === order.id && o.store_type === order.store_type)));
+        setSelectedOrders(prev => prev.filter(o => !(o.id === order.id && o.store_type === order.store_type)));
+        alert(`✅ Order #${order.order_number} skipped - customer will not receive tracking.`);
+      } else {
+        const data = await response.json();
+        alert('Failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) { alert('Error: ' + error.message); }
+  };
+
   const isOrderSelected = (order) => {
     return selectedOrders.some(o => `${o.store_type}-${o.id}` === `${order.store_type}-${order.id}`);
   };
@@ -702,7 +721,7 @@ function App() {
                               title="Select all"
                             />
                           </th>
-                          <th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>STORE</th><th>ORDER DATE</th>
+                          <th>ORDER #</th><th>CUSTOMER</th><th>COUNTRY</th><th>AMOUNT</th><th>STORE</th><th>ORDER DATE</th><th>ACTIONS</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -721,9 +740,10 @@ function App() {
                             <td>{order.currency} {parseFloat(order.total_price).toFixed(2)}</td>
                             <td><span className={`store-badge ${order.store_type}`}>{order.store_type === 'woocommerce' ? '🌐' : '🛒'} {order.store_name || order.store_domain}</span>{order.wc_status === 'completed' && <span className="status completed" style={{marginLeft: '4px', fontSize: '10px'}}>WC:completed</span>}</td>
                             <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                            <td><button className="btn-small btn-delete" onClick={() => skipOrder(order)} title="Skip - customer will not get tracking">⛔ Skip</button></td>
                           </tr>
                         ))}
-                        {filteredPendingOrders.length === 0 && (<tr><td colSpan="7" className="no-data">🎉 No pending orders - all orders are fulfilled!</td></tr>)}
+                        {filteredPendingOrders.length === 0 && (<tr><td colSpan="8" className="no-data">🎉 No pending orders - all orders are fulfilled!</td></tr>)}
                       </tbody>
                     </table>
                   </>
