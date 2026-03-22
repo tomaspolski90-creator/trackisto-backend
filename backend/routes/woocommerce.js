@@ -310,6 +310,13 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
     
     let allOrders = [];
     
+    // Get all skipped order IDs
+    let skippedOrderIds = [];
+    try {
+      const skippedResult = await db.query("SELECT order_id FROM skipped_orders WHERE store_type = 'woocommerce'");
+      skippedOrderIds = skippedResult.rows.map(r => r.order_id);
+    } catch (e) { /* table might not exist yet */ }
+    
     for (const store of stores) {
       // ============================================
       // FIX 2: Henter OGSÅ completed orders, ikke kun processing
@@ -318,6 +325,11 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
       const orders = await fetchWooCommerceOrders(store, 'processing,completed');
       
       for (const order of orders) {
+        // Skip orders that have been manually skipped
+        if (skippedOrderIds.includes(order.id.toString())) {
+          continue;
+        }
+        
         // Tjek om ordren allerede har et shipment-record i vores DB
         const existingShipment = await db.query(
           'SELECT id FROM shipments WHERE shopify_order_id = $1',
@@ -486,6 +498,13 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
     let fulfilledCount = 0;
     let errors = [];
     
+    // Get skipped order IDs
+    let skippedOrderIds = [];
+    try {
+      const skippedResult = await db.query("SELECT order_id FROM skipped_orders WHERE store_type = 'woocommerce'");
+      skippedOrderIds = skippedResult.rows.map(r => r.order_id);
+    } catch (e) { /* table might not exist yet */ }
+    
     for (const store of storesResult.rows) {
       console.log(`[WooCommerce Fetch-Fulfill] Processing store: ${store.domain}`);
       
@@ -502,6 +521,12 @@ router.post('/fetch-and-fulfill', authMiddleware, async (req, res) => {
       console.log(`[WooCommerce Fetch-Fulfill] Found ${orders.length} orders to process`);
       
       for (const order of orders) {
+        // Skip manually skipped orders
+        if (skippedOrderIds.includes(order.id.toString())) {
+          console.log(`[WooCommerce Fetch-Fulfill] Skipping order ${order.id} - manually skipped`);
+          continue;
+        }
+        
         const existing = await db.query(
           'SELECT id FROM shipments WHERE shopify_order_id = $1',
           [order.id.toString()]
@@ -664,6 +689,13 @@ async function processWooCommerceAutoFulfillment() {
     
     console.log(`[WooCommerce Auto-Fulfill] Found ${storesResult.rows.length} connected WooCommerce stores`);
 
+    // Get skipped order IDs
+    let autoSkippedIds = [];
+    try {
+      const skRes = await db.query("SELECT order_id FROM skipped_orders WHERE store_type = 'woocommerce'");
+      autoSkippedIds = skRes.rows.map(r => r.order_id);
+    } catch (e) { /* table might not exist yet */ }
+
     for (const store of storesResult.rows) {
       const fulfillmentTime = store.fulfillment_time || '16:00';
       const [targetHour, targetMinute] = fulfillmentTime.split(':').map(Number);
@@ -682,6 +714,11 @@ async function processWooCommerceAutoFulfillment() {
         console.log(`[WooCommerce Auto-Fulfill] Found ${orders.length} orders (processing + completed)`);
 
         for (const order of orders) {
+          // Skip manually skipped orders
+          if (autoSkippedIds.includes(order.id.toString())) {
+            continue;
+          }
+          
           const existing = await db.query(
             'SELECT id FROM shipments WHERE shopify_order_id = $1',
             [order.id.toString()]
@@ -779,6 +816,56 @@ async function processWooCommerceAutoFulfillment() {
     console.error('[WooCommerce Auto-Fulfill] Error:', error);
   }
 }
+
+// ============================================
+// SKIPPED ORDERS MANAGEMENT
+// ============================================
+
+// Skip an order (prevent it from being fulfilled)
+router.post('/skip-order', authMiddleware, async (req, res) => {
+  try {
+    const { order_id, customer_name, store_type } = req.body;
+    if (!order_id) return res.status(400).json({ error: 'order_id is required' });
+    
+    await db.query(
+      'INSERT INTO skipped_orders (order_id, store_type, customer_name) VALUES ($1, $2, $3) ON CONFLICT (order_id, store_type) DO NOTHING',
+      [order_id.toString(), store_type || 'woocommerce', customer_name || '']
+    );
+    
+    console.log(`[Skipped Orders] Skipped order ${order_id} (${customer_name})`);
+    res.json({ success: true, message: `Order ${order_id} skipped` });
+  } catch (error) {
+    console.error('[Skipped Orders] Error:', error);
+    res.status(500).json({ error: 'Failed to skip order' });
+  }
+});
+
+// Unskip an order
+router.post('/unskip-order', authMiddleware, async (req, res) => {
+  try {
+    const { order_id, store_type } = req.body;
+    await db.query(
+      'DELETE FROM skipped_orders WHERE order_id = $1 AND store_type = $2',
+      [order_id.toString(), store_type || 'woocommerce']
+    );
+    console.log(`[Skipped Orders] Unskipped order ${order_id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Skipped Orders] Error:', error);
+    res.status(500).json({ error: 'Failed to unskip order' });
+  }
+});
+
+// Get all skipped orders
+router.get('/skipped-orders', authMiddleware, async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM skipped_orders ORDER BY created_at DESC');
+    res.json({ skippedOrders: result.rows });
+  } catch (error) {
+    console.error('[Skipped Orders] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch skipped orders' });
+  }
+});
 
 router.processWooCommerceAutoFulfillment = processWooCommerceAutoFulfillment;
 module.exports = router;
