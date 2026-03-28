@@ -42,6 +42,8 @@ function App() {
   const [dashboardTab, setDashboardTab] = useState('recent');
   const [pendingOrders, setPendingOrders] = useState([]);
   const [fulfilledOrders, setFulfilledOrders] = useState([]);
+  const [fulfilledPage, setFulfilledPage] = useState(1);
+  const [fulfilledPagination, setFulfilledPagination] = useState({ totalPages: 1, totalCount: 0 });
   const [pendingLoading, setPendingLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,10 +142,10 @@ function App() {
     setPendingLoading(false);
   };
 
-  const fetchFulfilledOrders = async (storeFilter = selectedStore) => {
+  const fetchFulfilledOrders = async (storeFilter = selectedStore, page = fulfilledPage) => {
     setPendingLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/shipments`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const response = await fetch(`${API_URL}/api/shipments?page=${page}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         let orders = data.shipments || [];
@@ -152,6 +154,7 @@ function App() {
           if (store) orders = orders.filter(o => o.shopify_store_id === store.id);
         }
         setFulfilledOrders(orders);
+        setFulfilledPagination(data.pagination || { totalPages: 1, totalCount: orders.length });
       }
     } catch (error) { console.error('Error fetching fulfilled orders:', error); }
     setPendingLoading(false);
@@ -780,7 +783,23 @@ function App() {
                     </tbody>
                   </table>
                 )}
-                <div className="pending-info"><p>Fulfilled Shipments ({filteredFulfilledOrders.length} results)</p></div>
+                <div className="pending-info"><p>Fulfilled Shipments ({fulfilledPagination.totalCount} results)</p>
+                  {fulfilledPagination.totalPages > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                      <button
+                        className="btn-small"
+                        onClick={() => { const p = fulfilledPage - 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
+                        disabled={fulfilledPage <= 1}
+                      >← Previous</button>
+                      <span style={{ fontSize: '14px', color: '#555' }}>Page {fulfilledPage} of {fulfilledPagination.totalPages}</span>
+                      <button
+                        className="btn-small"
+                        onClick={() => { const p = fulfilledPage + 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
+                        disabled={fulfilledPage >= fulfilledPagination.totalPages}
+                      >Next →</button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
