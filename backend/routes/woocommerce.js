@@ -672,12 +672,34 @@ function getDanishTime() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }));
 }
 
+// Count only Monday–Friday business days between two dates
+function countBusinessDays(fromDate, toDate) {
+  let count = 0;
+  const current = new Date(fromDate);
+  current.setHours(0, 0, 0, 0);
+  const end = new Date(toDate);
+  end.setHours(0, 0, 0, 0);
+  while (current < end) {
+    const day = current.getDay(); // 0=Sun, 6=Sat
+    if (day !== 0 && day !== 6) count++;
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
 async function processWooCommerceAutoFulfillment() {
   console.log('[WooCommerce Auto-Fulfill] Starting auto-fulfillment check...');
   const danishTime = getDanishTime();
   const currentHour = danishTime.getHours();
   const currentMinute = danishTime.getMinutes();
+  const currentDayOfWeek = danishTime.getDay(); // 0=Sun, 6=Sat
   const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+
+  // Never run auto-fulfillment on weekends
+  if (currentDayOfWeek === 0 || currentDayOfWeek === 6) {
+    console.log(`[WooCommerce Auto-Fulfill] Skipping — today is a weekend (day ${currentDayOfWeek})`);
+    return;
+  }
   
   console.log(`[WooCommerce Auto-Fulfill] Danish time: ${currentTimeStr}`);
 
@@ -731,10 +753,10 @@ async function processWooCommerceAutoFulfillment() {
           const sendOffset = store.send_offset || 0;
           if (sendOffset > 0) {
             const orderDate = new Date(order.date_created);
-            const now = new Date();
-            const daysSinceOrder = Math.floor((now - orderDate) / (24 * 60 * 60 * 1000));
-            if (daysSinceOrder < sendOffset) {
-              console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - send offset not reached (${daysSinceOrder}/${sendOffset} days)`);
+            const now = getDanishTime();
+            const businessDaysSinceOrder = countBusinessDays(orderDate, now);
+            if (businessDaysSinceOrder < sendOffset) {
+              console.log(`[WooCommerce Auto-Fulfill] Skipping order ${order.id} - send offset not reached (${businessDaysSinceOrder}/${sendOffset} business days)`);
               continue;
             }
           }
