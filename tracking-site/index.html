@@ -73,6 +73,7 @@
         .status-pill.in_transit { background: #cce5ff; color: #004085; }
         .status-pill.label_created { background: #fff3cd; color: #856404; }
         .status-pill.out_for_delivery { background: #e8f0fe; color: #5b6eae; }
+        .status-pill.exception { background: #f8d7da; color: #721c24; }
 
         .barcode-section { text-align: center; }
         .barcode-container { display: inline-block; background: white; padding: 0 15px 8px; }
@@ -95,7 +96,14 @@
         .progress-dot.active svg { fill: white; }
         .progress-dot.completed { border-color: #28a745; background: #28a745; }
         .progress-dot.completed svg { fill: white; }
+        .progress-dot.warning { border-color: #dc3545; background: #dc3545; }
+        .progress-dot.warning svg { fill: white; }
         .progress-label { font-size: 13px; color: #666; text-align: center; max-width: 90px; }
+        .progress-label.warning-label { color: #dc3545; font-weight: 600; }
+        .timeline-item.exception-item .timeline-content { background: #fff5f5; border-left: 3px solid #dc3545; }
+        .timeline-item.exception-item .timeline-status { color: #dc3545; }
+        .timeline-item.exception-item .timeline-dot { background: #fdecea; border-color: #dc3545; }
+        .timeline-item.exception-item .timeline-dot svg { fill: #dc3545; }
 
         .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 40px 0; }
         .info-item { padding: 24px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #29ABE2; }
@@ -121,6 +129,8 @@
         .btn.primary { background: #29ABE2; border-color: #29ABE2; color: white; }
         .btn.primary:hover { background: #1a8bc2; border-color: #1a8bc2; }
 
+        .tl-contact-sender { font-size: 13px; color: #dc3545; font-weight: 600; margin-top: 4px; }
+        .status-pill.exception { background: #f8d7da; color: #721c24; }
         .error { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; padding: 16px 20px; border-radius: 8px; margin-top: 20px; }
 
         .footer { background: #0d234b; color: white; padding: 60px 24px 30px; margin-top: 80px; }
@@ -307,7 +317,7 @@
                     <div class="progress-step"><div class="progress-dot" id="dot1"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div class="progress-label">Order Created</div></div>
                     <div class="progress-step"><div class="progress-dot" id="dot2"><svg viewBox="0 0 24 24"><path d="M18 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM19.5 9.5L21.46 12H17V9.5h2.5zM6 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg></div><div class="progress-label">In Transit</div></div>
                     <div class="progress-step"><div class="progress-dot" id="dot3"><svg viewBox="0 0 24 24"><path d="M18 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM19.5 9.5L21.46 12H17V9.5h2.5zM6 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg></div><div class="progress-label">Out for Delivery</div></div>
-                    <div class="progress-step"><div class="progress-dot" id="dot4"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div class="progress-label">Delivered</div></div>
+                    <div class="progress-step"><div class="progress-dot" id="dot4"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div><div class="progress-label" id="dot4Label">Delivered</div></div>
                 </div>
             </div>
             <div class="info-grid">
@@ -393,11 +403,16 @@
             generateBarcode(data.trackingNumber);
             document.getElementById('barcodeText').textContent = data.trackingNumber;
             const statusPill = document.getElementById('displayStatus');
-            statusPill.textContent = data.status.replace('_', ' ');
-            statusPill.className = 'status-pill ' + data.status;
-            updateProgress(data.status);
             const deliveryDate = new Date(data.delivery.estimatedDate);
-            document.getElementById('displayDeliveryDate').textContent = deliveryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            const today = new Date(); today.setHours(0,0,0,0); deliveryDate.setHours(0,0,0,0);
+            const showException = data.status === 'exception' && today >= deliveryDate;
+            const displayedStatus = showException ? 'exception' : (data.status === 'exception' ? 'in_transit' : data.status);
+            statusPill.textContent = showException ? 'Shipment damaged after inspection' : displayedStatus.replace(/_/g, ' ');
+            statusPill.className = 'status-pill ' + displayedStatus;
+            if (showException) { statusPill.style.background = '#f8d7da'; statusPill.style.color = '#721c24'; }
+            updateProgress(displayedStatus);
+            const deliveryDate2 = new Date(data.delivery.estimatedDate);
+            document.getElementById('displayDeliveryDate').textContent = deliveryDate2.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
             document.getElementById('displayDestination').textContent = (data.customer.address || '') + ', ' + data.customer.zipCode + ' ' + data.customer.city + ', ' + data.customer.country;
             document.getElementById('displayRecipient').textContent = data.customer.name;
             const timelineContainer = document.getElementById('timelineContainer');
@@ -405,10 +420,15 @@
             data.timeline.forEach((event) => {
                 const eventDate = new Date(event.date);
                 const timelineItem = document.createElement('div');
-                timelineItem.className = 'timeline-item';
-                const icon = getTimelineIcon(event.status);
+                const isDamagedEvent = event.status.toLowerCase().includes('damaged') || event.status.toLowerCase().includes('inspection hold') || event.status.toLowerCase().includes('exception');
+                const isException = isDamagedEvent && showException;
+                timelineItem.className = 'timeline-item' + (isException ? ' exception-item' : '');
+                const warningTriangle = '<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+                const icon = isException ? warningTriangle : getTimelineIcon(event.status);
+                const displayStatus = event.status;
+                const contactLine = isException ? '<div class="tl-contact-sender">Contact Sender</div>' : '';
                 const formattedTime = formatTime(event.time);
-                timelineItem.innerHTML = '<div class="timeline-dot">' + icon + '</div><div class="timeline-content"><div class="timeline-status">' + event.status + '</div><div class="timeline-location">' + event.location + '</div><div class="timeline-time">' + eventDate.toLocaleDateString('en-GB') + ' at ' + formattedTime + '</div></div>';
+                timelineItem.innerHTML = '<div class="timeline-dot">' + icon + '</div><div class="timeline-content"><div class="timeline-status">' + displayStatus + '</div>' + contactLine + '<div class="timeline-location">' + event.location + '</div><div class="timeline-time">' + eventDate.toLocaleDateString('en-GB') + ' at ' + formattedTime + '</div></div>';
                 timelineContainer.appendChild(timelineItem);
             });
         }
@@ -445,8 +465,14 @@
         function updateProgress(status) {
             const progressFill = document.getElementById('progressFill');
             const dots = [document.getElementById('dot1'),document.getElementById('dot2'),document.getElementById('dot3'),document.getElementById('dot4')];
-            let progress = 0, completedDots = 0, activeDot = -1;
+            const dot4Label = document.getElementById('dot4Label');
+            let progress = 0, completedDots = 0, activeDot = -1, warningDot = -1;
             
+            // Reset dot4 to default state
+            dot4Label.textContent = 'Delivered';
+            dot4Label.classList.remove('warning-label');
+            dots[3].innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+
             if (status === 'label_created') { 
                 progress = 8; 
                 completedDots = 1;
@@ -467,15 +493,26 @@
                 completedDots = 4;
                 activeDot = -1;
             }
+            else if (status === 'exception') {
+                progress = 70;
+                completedDots = 2;
+                activeDot = -1;
+                warningDot = 3;
+                dot4Label.textContent = 'Contact Sender';
+                dot4Label.classList.add('warning-label');
+                dots[3].innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+            }
             
             setTimeout(() => { progressFill.style.width = progress + '%'; }, 100);
             
             dots.forEach((dot, index) => { 
-                dot.classList.remove('active', 'completed'); 
+                dot.classList.remove('active', 'completed', 'warning'); 
                 if (index < completedDots) {
                     dot.classList.add('completed');
                 } else if (index === activeDot) {
                     dot.classList.add('active');
+                } else if (index === warningDot) {
+                    dot.classList.add('warning');
                 }
             });
         }
