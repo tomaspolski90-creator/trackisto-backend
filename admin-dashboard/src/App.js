@@ -322,7 +322,25 @@ function App() {
   });
 
   useEffect(() => {
-    if (token) { setIsLoggedIn(true); fetchDashboardData(); }
+    if (token) {
+      // Verify token is still valid before loading dashboard
+      fetch(`${API_URL}/api/auth/verify`, { headers: { 'Authorization': `Bearer ${token}` } })
+        .then(res => {
+          if (res.ok) {
+            setIsLoggedIn(true);
+            fetchDashboardData();
+          } else {
+            // Token expired or invalid — force re-login
+            localStorage.removeItem('token');
+            setToken(null);
+            setIsLoggedIn(false);
+          }
+        })
+        .catch(() => {
+          setIsLoggedIn(true);
+          fetchDashboardData();
+        });
+    }
   }, [token, fetchDashboardData]);
 
   useEffect(() => {
