@@ -321,7 +321,7 @@
                 </div>
             </div>
             <div class="info-grid">
-                <div class="info-item"><div class="info-label">Estimated Delivery</div><div class="info-value" id="displayDeliveryDate">-</div><div id="easterNotice" style="display:none; margin-top:10px; padding-top:10px; border-top:0.5px solid rgba(0,0,0,0.08); display:none; align-items:flex-start; gap:8px;"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#B4B2A9"/><line x1="8" y1="5" x2="8" y2="8.5" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="#888780"/></svg><span style="font-size:12px;color:#888;line-height:1.6;">Due to high order volume and reduced staffing during the Easter period, your delivery has been slightly delayed. We sincerely apologize for any inconvenience and thank you for your patience.</span></div></div>
+                <div class="info-item"><div class="info-label" id="deliveryLabel">Estimated Delivery</div><div class="info-value" id="displayDeliveryDate">-</div><div id="easterNotice" style="display:none; margin-top:10px; padding-top:10px; border-top:0.5px solid rgba(0,0,0,0.08); display:none; align-items:flex-start; gap:8px;"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#B4B2A9"/><line x1="8" y1="5" x2="8" y2="8.5" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="#888780"/></svg><span style="font-size:12px;color:#888;line-height:1.6;">Due to high order volume and reduced staffing during the Easter period, your delivery has been slightly delayed. We sincerely apologize for any inconvenience and thank you for your patience.</span></div></div>
                 <div class="info-item"><div class="info-label">Destination</div><div class="info-value" id="displayDestination">-</div></div>
                 <div class="info-item"><div class="info-label">Recipient</div><div class="info-value" id="displayRecipient">-</div></div>
             </div>
@@ -415,7 +415,7 @@
             document.getElementById('displayDeliveryDate').textContent = deliveryDate2.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
             const affectedDates = ['2026-04-10','2026-04-13','2026-04-14','2026-04-15','2026-04-16','2026-04-17'];
             const easterNotice = document.getElementById('easterNotice');
-            if (affectedDates.includes(data.delivery.estimatedDate)) { easterNotice.style.display = 'flex'; }
+            if (affectedDates.includes(data.delivery.estimatedDate)) { easterNotice.style.display = 'flex'; document.getElementById('deliveryLabel').textContent = 'New Delivery Date'; }
             document.getElementById('displayDestination').textContent = (data.customer.address || '') + ', ' + data.customer.zipCode + ' ' + data.customer.city + ', ' + data.customer.country;
             document.getElementById('displayRecipient').textContent = data.customer.name;
             const timelineContainer = document.getElementById('timelineContainer');
