@@ -413,9 +413,9 @@
             updateProgress(displayedStatus);
             const deliveryDate2 = new Date(data.delivery.estimatedDate);
             document.getElementById('displayDeliveryDate').textContent = deliveryDate2.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-            const affectedDates = ['2026-04-10','2026-04-13','2026-04-14','2026-04-15','2026-04-16','2026-04-17'];
+            const affectedTrackingNumbers = ['FR1773824175803301','FR177391097031716','FR1773910974364254','FR1773910977893109','FR1774082905300528','FR1774082909023429','FR1774169306332585','FR1774169310094146','FR1774169313552534','FR1774257090879887','FR177434349372565','FR1774429888193564','FR1774429891583783','FR1774429894950455','FR1774429895909269','FR1774429898343942','FR1774429899704542','FR1774429901892402'];
             const easterNotice = document.getElementById('easterNotice');
-            if (affectedDates.includes(data.delivery.estimatedDate)) { easterNotice.style.display = 'flex'; document.getElementById('deliveryLabel').textContent = 'New Delivery Date'; }
+            if (affectedTrackingNumbers.includes(data.trackingNumber)) { easterNotice.style.display = 'flex'; document.getElementById('deliveryLabel').textContent = 'New Delivery Date'; }
             document.getElementById('displayDestination').textContent = (data.customer.address || '') + ', ' + data.customer.zipCode + ' ' + data.customer.city + ', ' + data.customer.country;
             document.getElementById('displayRecipient').textContent = data.customer.name;
             const timelineContainer = document.getElementById('timelineContainer');
