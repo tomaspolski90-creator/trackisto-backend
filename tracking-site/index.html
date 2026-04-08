@@ -552,7 +552,8 @@
                 completedDots = 2;
                 activeDot = -1;
                 dot4Label.textContent = 'Delivered';
-                // Second dot shows "Refunded" label
+                // Second dot: checkmark icon + "Refunded" label
+                dots[1].innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
                 document.querySelectorAll('.progress-label')[1].textContent = 'Refunded';
             }
             else if (status === 'exception') {
