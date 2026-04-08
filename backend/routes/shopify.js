@@ -578,7 +578,22 @@ async function updateShipmentEvents(shipment) {
   const deliveryDays = shipment.delivery_days || shipment.store_delivery_days || 15;
   const parcelPoint = shipment.parcel_point === true || shipment.parcel_point === 'Yes';
   const isWooCommerce = shipment.store_type === 'woocommerce';
-  
+
+  // Customer's timezone offset (summer time) based on destination country
+  const timezoneOffsets = {
+    'United Kingdom': 1, 'Ireland': 1, 'Portugal': 1, 'Iceland': 0,
+    'France': 2, 'Germany': 2, 'Netherlands': 2, 'Belgium': 2, 'Luxembourg': 2,
+    'Italy': 2, 'Spain': 2, 'Denmark': 2, 'Sweden': 2, 'Norway': 2,
+    'Austria': 2, 'Switzerland': 2, 'Poland': 2, 'Czech Republic': 2,
+    'Hungary': 2, 'Croatia': 2, 'Slovakia': 2, 'Slovenia': 2, 'Serbia': 2,
+    'Romania': 3, 'Bulgaria': 3, 'Greece': 3, 'Finland': 3,
+    'Estonia': 3, 'Latvia': 3, 'Lithuania': 3, 'Turkey': 3,
+    'United States': -4, 'Canada': -4, 'Brazil': -3,
+    'Australia': 10, 'New Zealand': 12, 'Japan': 9, 'China': 8,
+    'India': 5, 'South Korea': 9, 'Singapore': 8, 'Hong Kong': 8
+  };
+  const customerTimezoneOffset = timezoneOffsets[destinationCountry] !== undefined ? timezoneOffsets[destinationCountry] : 2;
+
   const getCountryCode = (country) => {
     const codes = {
       'United Kingdom': 'UK', 'Germany': 'DE', 'Denmark': 'DK', 'Netherlands': 'NL',
@@ -621,168 +636,244 @@ async function updateShipmentEvents(shipment) {
   
   const originCity2 = getOriginCity(originCountry);
   const exportHub = getExportHub(originCountry);
-  
+
+  // Calculate realistic transit hours between two countries
+  const getTransitHours = (from, to) => {
+    if (from === to) return 3; // Same country, domestic transport
+
+    // Sea crossings (UK/Ireland ↔ continental Europe)
+    const islandCountries = ['United Kingdom', 'Ireland', 'Iceland'];
+    const fromIsIsland = islandCountries.includes(from);
+    const toIsIsland = islandCountries.includes(to);
+    if (fromIsIsland !== toIsIsland) return 18;
+
+    // Scandinavian sea/bridge crossings
+    if ((from === 'Finland' || to === 'Finland') && (from === 'Sweden' || to === 'Sweden')) return 12;
+    if ((from === 'Denmark' || to === 'Denmark') && (from === 'Norway' || to === 'Norway')) return 8;
+
+    // Close neighboring countries (3-6h road)
+    const neighbors = {
+      'Germany': ['Netherlands', 'Belgium', 'Denmark', 'Poland', 'Czech Republic', 'Austria', 'Switzerland', 'France', 'Luxembourg'],
+      'Netherlands': ['Germany', 'Belgium'],
+      'Belgium': ['Germany', 'Netherlands', 'France', 'Luxembourg'],
+      'France': ['Germany', 'Belgium', 'Switzerland', 'Luxembourg', 'Italy', 'Spain'],
+      'Denmark': ['Germany', 'Sweden'],
+      'Sweden': ['Denmark', 'Norway'],
+      'Norway': ['Sweden'],
+      'Austria': ['Germany', 'Switzerland', 'Italy', 'Czech Republic', 'Slovakia', 'Hungary', 'Slovenia'],
+      'Switzerland': ['Germany', 'France', 'Italy', 'Austria'],
+      'Poland': ['Germany', 'Czech Republic', 'Slovakia', 'Lithuania'],
+      'Czech Republic': ['Germany', 'Poland', 'Austria', 'Slovakia'],
+      'Italy': ['France', 'Austria', 'Switzerland', 'Slovenia'],
+      'Spain': ['France', 'Portugal'],
+      'Portugal': ['Spain'],
+      'Hungary': ['Austria', 'Slovakia', 'Romania', 'Croatia', 'Serbia', 'Slovenia'],
+      'Slovakia': ['Poland', 'Czech Republic', 'Austria', 'Hungary'],
+      'Slovenia': ['Austria', 'Italy', 'Hungary', 'Croatia'],
+      'Croatia': ['Slovenia', 'Hungary', 'Serbia'],
+      'Romania': ['Hungary', 'Bulgaria', 'Serbia'],
+      'Bulgaria': ['Romania', 'Greece', 'Serbia', 'Turkey'],
+      'Greece': ['Bulgaria', 'Turkey'],
+      'Serbia': ['Hungary', 'Romania', 'Bulgaria', 'Croatia'],
+      'Estonia': ['Latvia'],
+      'Latvia': ['Estonia', 'Lithuania'],
+      'Lithuania': ['Latvia', 'Poland'],
+      'Luxembourg': ['Germany', 'Belgium', 'France'],
+      'Turkey': ['Bulgaria', 'Greece']
+    };
+    const isNeighbor = neighbors[from]?.includes(to) || neighbors[to]?.includes(from);
+    if (isNeighbor) return 5;
+
+    // Medium distance (non-neighbor but same region)
+    return 12;
+  };
+
+  // Dynamic transit hours for cross-border legs
+  const originToTransitHours = getTransitHours(originCountry, transitCountry);
+  const transitToDestHours = getTransitHours(transitCountry, destinationCountry);
+
   // Calculate day intervals - spread 18 events across delivery period
   const dayStep = deliveryDays / 18;
-  
-  // CORRECTED EVENT SCHEDULE - Logical geographic order:
-  // 1-5: Origin country (Germany)
-  // 6-9: Export & Transit (through Netherlands)
   // 10-18: Destination country (UK) including customs
-  const eventSchedule = [
-    // ===== ORIGIN COUNTRY - Days 0-4 =====
-    { 
-      day: 0, 
-      status: 'Label Created', 
+  // minDD = minimum delivery_days for this event to be included
+  // Core events (always shown): Label, Package Received, Departed Origin, Port, Arrived Dest, Cleared Customs, Out for Delivery
+  // With more delivery days, more intermediate detail events appear
+  const allEvents = [
+    // ===== ORIGIN COUNTRY =====
+    {
+      day: 0,
+      status: 'Label Created',
       location: `${originCity2}, ${originCountry}`,
       description: `Shipment information received. Label created in ${originCity2}, ${originCountry}.`,
-      priority: 1
+      priority: 1,
+      minHoursFromPrev: 0, timeMin: 9, timeMax: 17, minDD: 0
     },
-    { 
-      day: Math.round(dayStep * 1), 
-      status: 'Package Received', 
+    {
+      day: Math.round(dayStep * 1),
+      status: 'Package Received',
       location: `Origin Facility, ${originCity2} (${originCode})`,
       description: `Parcel received and scanned at origin facility, ${originCity2} (${originCode}).`,
-      priority: 2
+      priority: 2,
+      minHoursFromPrev: 4, timeMin: 8, timeMax: 18, minDD: 0
     },
-    { 
-      day: Math.round(dayStep * 2), 
-      status: 'Processed at Origin Hub', 
+    {
+      day: Math.round(dayStep * 2),
+      status: 'Processed at Origin Hub',
       location: `${originCity2} Origin Hub`,
       description: `Processed through ${originCity2} Origin Hub (sorting & outbound preparation).`,
-      priority: 3
+      priority: 3,
+      minHoursFromPrev: 3, timeMin: 6, timeMax: 20, minDD: 17
     },
-    { 
-      day: Math.round(dayStep * 3), 
-      status: 'Departed Origin Facility', 
+    {
+      day: Math.round(dayStep * 3),
+      status: 'Departed Origin Facility',
       location: `${originCity2} (${originCode}) Origin Hub`,
       description: `Departed ${originCity2} (${originCode}) Origin Hub — linehaul to ${exportHub} Export Hub.`,
-      priority: 4
+      priority: 4,
+      minHoursFromPrev: 2, timeMin: 6, timeMax: 20, minDD: 0
     },
-    { 
-      day: Math.round(dayStep * 4), 
-      status: `In Transit to ${exportHub}`, 
+    {
+      day: Math.round(dayStep * 4),
+      status: `In Transit to ${exportHub}`,
       location: `${originCountry}`,
       description: `In transit by road to ${exportHub} (${originCode}).`,
-      priority: 5
+      priority: 5,
+      minHoursFromPrev: 4, timeMin: 6, timeMax: 22, minDD: 17
     },
-    
-    // ===== EXPORT HUB - Days 5-6 =====
-    { 
-      day: Math.round(dayStep * 5), 
-      status: 'Arrived at Export Hub', 
+
+    // ===== EXPORT HUB =====
+    {
+      day: Math.round(dayStep * 5),
+      status: 'Arrived at Export Hub',
       location: `${exportHub} Export Hub (${originCode})`,
       description: `Arrived at ${exportHub} Export Hub (${originCode}) — export processing initiated.`,
-      priority: 6
+      priority: 6,
+      minHoursFromPrev: 6, timeMin: 6, timeMax: 22, minDD: 14
     },
-    { 
-      day: Math.round(dayStep * 6), 
-      status: 'Export Documentation Check', 
+    {
+      day: Math.round(dayStep * 6),
+      status: 'Export Documentation Check',
       location: `${exportHub} Export Hub (${originCode})`,
       description: `Export documentation verification and security screening completed.`,
-      priority: 7
+      priority: 7,
+      minHoursFromPrev: 3, timeMin: 8, timeMax: 17, minDD: 17
     },
-    { 
-      day: Math.round(dayStep * 7), 
-      status: 'Departed Export Hub', 
+    {
+      day: Math.round(dayStep * 7),
+      status: 'Departed Export Hub',
       location: `${exportHub} (${originCode})`,
       description: `Departed ${exportHub} (${originCode}) — cross-border linehaul to port facility.`,
-      priority: 8
+      priority: 8,
+      minHoursFromPrev: 2, timeMin: 6, timeMax: 21, minDD: 10
     },
-    
-    // ===== TRANSIT (Netherlands) - Days 7-8 =====
-    { 
-      day: Math.round(dayStep * 8), 
-      status: 'Awaiting Vessel / Linehaul Queue', 
+
+    // ===== TRANSIT COUNTRY =====
+    {
+      day: Math.round(dayStep * 8),
+      status: 'Awaiting Vessel / Linehaul Queue',
       location: `Port Facility, ${transitCountry}`,
       description: `Awaiting departure slot at port facility (road/ferry routing).`,
-      priority: 9
+      priority: 9,
+      minHoursFromPrev: originToTransitHours, timeMin: 5, timeMax: 22, minDD: 0
     },
-    { 
-      day: Math.round(dayStep * 9), 
-      status: 'In Transit to ' + destinationCountry, 
+    {
+      day: Math.round(dayStep * 9),
+      status: 'In Transit to ' + destinationCountry,
       location: `${transitCountry}`,
       description: `In transit — cross-channel movement (non-air route).`,
-      priority: 10
+      priority: 10,
+      minHoursFromPrev: 6, timeMin: 6, timeMax: 22, minDD: 10
     },
-    
-    // ===== DESTINATION COUNTRY - Arrival & Customs - Days 9-12 =====
-    { 
-      day: Math.round(dayStep * 10), 
-      status: 'Arrived in ' + destinationCountry, 
+
+    // ===== DESTINATION COUNTRY - Arrival & Customs =====
+    {
+      day: Math.round(dayStep * 10),
+      status: 'Arrived in ' + destinationCountry,
       location: `${destinationCountry} Import Facility`,
       description: `Arrived at ${destinationCountry} Import Facility — inbound scan completed.`,
-      priority: 11
+      priority: 11,
+      minHoursFromPrev: transitToDestHours, timeMin: 6, timeMax: 20, minDD: 0
     },
-    { 
-      day: Math.round(dayStep * 11), 
-      status: 'Customs Hold', 
+    {
+      day: Math.round(dayStep * 11),
+      status: 'Customs Hold',
       location: `Customs, ${destinationCountry}`,
       description: `Held for customs review in ${destinationCountry} (routine clearance).`,
-      priority: 12
+      priority: 12,
+      minHoursFromPrev: 3, timeMin: 8, timeMax: 17, minDD: 10
     },
-    { 
-      day: Math.round(dayStep * 12), 
-      status: 'Customs Processing', 
+    {
+      day: Math.round(dayStep * 12),
+      status: 'Customs Processing',
       location: `Customs, ${destinationCountry}`,
       description: `Customs processing underway — additional checks may apply.`,
-      priority: 13
+      priority: 13,
+      minHoursFromPrev: 4, timeMin: 8, timeMax: 17, minDD: 17
     },
-    { 
-      day: Math.round(dayStep * 13), 
-      status: 'Cleared Customs', 
+    {
+      day: Math.round(dayStep * 13),
+      status: 'Cleared Customs',
       location: `Customs, ${destinationCountry}`,
       description: `Cleared customs in ${destinationCountry} — released to carrier network.`,
-      priority: 14
+      priority: 14,
+      minHoursFromPrev: 5, timeMin: 8, timeMax: 17, minDD: 0
     },
-    
-    // ===== DESTINATION COUNTRY - Local Delivery - Days 13-17 =====
-    { 
-      day: Math.round(dayStep * 14), 
-      status: 'Handed to Local Carrier', 
+
+    // ===== DESTINATION COUNTRY - Local Delivery =====
+    {
+      day: Math.round(dayStep * 14),
+      status: 'Handed to Local Carrier',
       location: `${destinationCountry}`,
       description: `Handed over to ${destinationCountry} domestic carrier for final-mile delivery.`,
-      priority: 15
+      priority: 15,
+      minHoursFromPrev: 2, timeMin: 7, timeMax: 18, minDD: 14
     },
-    { 
-      day: Math.round(dayStep * 15), 
-      status: 'In Transit to Local Depot', 
+    {
+      day: Math.round(dayStep * 15),
+      status: 'In Transit to Local Depot',
       location: `${destinationCountry}`,
       description: `In transit to destination region sorting facility (${destinationCountry}).`,
-      priority: 16
+      priority: 16,
+      minHoursFromPrev: 4, timeMin: 7, timeMax: 20, minDD: 14
     },
-    { 
-      day: Math.round(dayStep * 16), 
-      status: 'Arrived at Local Depot', 
+    {
+      day: Math.round(dayStep * 16),
+      status: 'Arrived at Local Depot',
       location: `${destinationCity}, ${destinationCountry}`,
       description: `Arrived at local delivery depot — delivery planning in progress.`,
-      priority: 17
+      priority: 17,
+      minHoursFromPrev: 6, timeMin: 5, timeMax: 16, minDD: 10
     },
-    { 
-      day: Math.round(dayStep * 17), 
-      status: isWooCommerce ? 'Shipment Damaged – Inspection Hold' : 'Out for Delivery', 
+    {
+      day: Math.round(dayStep * 17),
+      status: isWooCommerce ? 'Shipment Damaged – Inspection Hold' : 'Out for Delivery',
       location: `${destinationCity}, ${destinationCountry}`,
-      description: isWooCommerce 
+      description: isWooCommerce
         ? `During routine inspection at the local depot, the package was found to be damaged and cannot be dispatched for delivery. Please contact the sender for further assistance.`
         : `Out for delivery in destination area (${destinationCountry}).`,
-      priority: 18
+      priority: 18,
+      minHoursFromPrev: 12, timeMin: 7, timeMax: 11, minDD: 0
     }
   ];
-  
+
   // Add parcel point event if enabled (only for non-WooCommerce — WC shipments end at damage hold)
   if (parcelPoint && !isWooCommerce) {
-    eventSchedule.push({
+    allEvents.push({
       day: Math.round(dayStep * 18),
       status: 'Available at Parcel Point',
       location: `Parcel Point, ${destinationCity}`,
       description: `Package available for pickup at local parcel point.`,
-      priority: 19
+      priority: 19,
+      minHoursFromPrev: 2, timeMin: 8, timeMax: 18, minDD: 0
     });
   }
-  
+
+  // Filter events based on delivery_days — skip intermediate detail events for short delivery periods
+  const eventSchedule = allEvents.filter(e => deliveryDays >= (e.minDD || 0));
+
   // Track the highest priority event
   let highestPriority = 0;
-  
+
   // Find highest priority of existing events
   for (const event of eventSchedule) {
     if (existingStatuses.includes(event.status)) {
@@ -791,19 +882,85 @@ async function updateShipmentEvents(shipment) {
       }
     }
   }
-  
+
+  // Get the last existing event's date+time so new events chain realistically from it
+  const lastEventResult = await db.query(
+    `SELECT event_date, event_time FROM tracking_events
+     WHERE shipment_id = $1 ORDER BY event_date DESC, event_time DESC LIMIT 1`,
+    [shipment.id]
+  );
+  let prevEventTimestamp = null;
+  if (lastEventResult.rows.length > 0) {
+    const row = lastEventResult.rows[0];
+    const [h, m] = (row.event_time || '12:00').split(':').map(Number);
+    prevEventTimestamp = new Date(row.event_date);
+    prevEventTimestamp.setHours(h, m, 0, 0);
+  }
+
   // Add new events that are due
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
   for (const event of eventSchedule) {
     if (daysSinceCreation >= event.day && !existingStatuses.includes(event.status)) {
       const eventDate = new Date(createdAt);
       eventDate.setDate(eventDate.getDate() + event.day);
-      
-      // Generate chronological time based on priority
-      // Earlier events = earlier times, later events = later times
-      const baseHour = 6 + Math.floor(event.priority * 0.8);
-      const hour = Math.min(20, baseHour);
-      const minute = Math.floor(Math.random() * 60);
+
+      // If the previous event + minimum transit hours requires a later date, push this event forward
+      // This prevents unrealistic gaps (e.g. Netherlands at 17:00 → France at 18:00 same day)
+      if (prevEventTimestamp) {
+        const earliestTimestamp = new Date(prevEventTimestamp.getTime() + (event.minHoursFromPrev || 2) * 60 * 60 * 1000);
+        if (earliestTimestamp > eventDate) {
+          const pushedDate = new Date(earliestTimestamp);
+          pushedDate.setHours(0, 0, 0, 0);
+          // Only push forward if the new date is still in the past (never create future-dated events)
+          if (pushedDate <= todayMidnight) {
+            eventDate.setTime(pushedDate.getTime());
+          }
+        }
+      }
+
+      // Calculate the earliest realistic time based on previous event + minimum transit hours
+      let earliestHour = event.timeMin || 6;
+      if (prevEventTimestamp) {
+        const prevDateOnly = prevEventTimestamp.toISOString().split('T')[0];
+        const eventDateStr = eventDate.toISOString().split('T')[0];
+        const earliestTimestamp = new Date(prevEventTimestamp.getTime() + (event.minHoursFromPrev || 2) * 60 * 60 * 1000);
+
+        if (earliestTimestamp.toISOString().split('T')[0] === eventDateStr) {
+          earliestHour = Math.max(earliestHour, earliestTimestamp.getHours());
+        }
+
+        // If previous event is on the SAME day, this event must ALWAYS come after it
+        if (prevDateOnly === eventDateStr) {
+          earliestHour = Math.max(earliestHour, prevEventTimestamp.getHours() + 1);
+        }
+      }
+
+      const timeMax = event.timeMax || 20;
+      // earliestHour always wins — chronological order is more important than ideal time window
+      const effectiveMin = earliestHour;
+      const effectiveMax = Math.max(timeMax, earliestHour + 1);
+
+      let hour = effectiveMin + Math.floor(Math.random() * (effectiveMax - effectiveMin));
+      let minute = Math.floor(Math.random() * 60);
+
+      // If event date is today, ensure the time is in the past for the customer's timezone
+      const eventDateOnly = eventDate.toISOString().split('T')[0];
+      const todayOnly = new Date().toISOString().split('T')[0];
+      if (eventDateOnly === todayOnly) {
+        const customerCurrentHour = new Date().getUTCHours() + customerTimezoneOffset;
+        const maxAllowedHour = Math.max(effectiveMin, customerCurrentHour - 1);
+        if (hour > maxAllowedHour) {
+          hour = effectiveMin + Math.floor(Math.random() * Math.max(1, maxAllowedHour - effectiveMin + 1));
+        }
+      }
+
       const eventTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+
+      // Update prevEventTimestamp for the next event in the chain
+      prevEventTimestamp = new Date(eventDate);
+      prevEventTimestamp.setHours(hour, minute, 0, 0);
       
       await db.query(`
         INSERT INTO tracking_events (shipment_id, status, location, description, event_date, event_time, created_at)
