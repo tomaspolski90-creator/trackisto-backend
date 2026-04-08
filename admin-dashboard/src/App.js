@@ -694,7 +694,7 @@ function App() {
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
                 <table>
-                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
+                  <thead><tr><th>ORDER #</th><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
                   <tbody>
                     {filteredShipments.slice(0, 10).map(s => {
                       const storeInfo = getStoreInfo(s.shopify_store_id);
@@ -703,6 +703,7 @@ function App() {
                         : '-';
                       return (
                         <tr key={s.id}>
+                          <td>{s.shopify_order_id ? `#${s.shopify_order_id}` : '-'}</td>
                           <td>{s.tracking_number}</td>
                           <td>{s.customer_name}</td>
                           <td>{s.country}</td>
@@ -718,7 +719,7 @@ function App() {
                         </tr>
                       );
                     })}
-                    {filteredShipments.length === 0 && (<tr><td colSpan="8" className="no-data">No shipments found</td></tr>)}
+                    {filteredShipments.length === 0 && (<tr><td colSpan="9" className="no-data">No shipments found</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -782,7 +783,7 @@ function App() {
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading fulfilled orders...</div>) : (
                   <table>
-                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
+                    <thead><tr><th>ORDER #</th><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
                     <tbody>
                       {filteredFulfilledOrders.map(order => {
                         const storeInfo = getStoreInfo(order.shopify_store_id);
@@ -791,6 +792,7 @@ function App() {
                           : '-';
                         return (
                           <tr key={order.id}>
+                            <td>{order.shopify_order_id ? `#${order.shopify_order_id}` : '-'}</td>
                             <td>{order.tracking_number || '-'}</td>
                             <td>{order.customer_name}</td>
                             <td>{order.country}</td>
@@ -806,7 +808,7 @@ function App() {
                           </tr>
                         );
                       })}
-                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="8" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
+                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="9" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
                     </tbody>
                   </table>
                 )}
