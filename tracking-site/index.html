@@ -421,18 +421,21 @@
             // Refund override for FR1775548446546411
             const refundTracking = 'FR1775548446546411';
             const refundTime = new Date('2026-04-08T15:30:00+02:00');
-            const isRefunded = data.trackingNumber === refundTracking && new Date() >= refundTime;
+            const now = new Date();
+            const isRefundedOrder = data.trackingNumber === refundTracking;
+            const isRefundVisible = isRefundedOrder && now >= refundTime;
 
-            const showException = !isRefunded && data.status === 'exception' && today >= deliveryDate;
+            const showException = !isRefundedOrder && data.status === 'exception' && today >= deliveryDate;
             let displayedStatus = showException ? 'exception' : (data.status === 'exception' ? 'in_transit' : data.status);
-            if (isRefunded) displayedStatus = 'refunded';
-            statusPill.textContent = isRefunded ? 'ORDER REFUNDED' : (showException ? 'Shipment damaged after inspection' : displayedStatus.replace(/_/g, ' '));
+            // Before 15:30: show as label_created (original status). After 15:30: show as refunded.
+            if (isRefundedOrder) displayedStatus = isRefundVisible ? 'refunded' : 'label_created';
+            statusPill.textContent = isRefundVisible ? 'ORDER REFUNDED' : (showException ? 'Shipment damaged after inspection' : displayedStatus.replace(/_/g, ' '));
             statusPill.className = 'status-pill ' + displayedStatus;
             if (showException) { statusPill.style.background = '#f8d7da'; statusPill.style.color = '#721c24'; }
             updateProgress(displayedStatus);
             const deliveryDate2 = new Date(data.delivery.estimatedDate);
             const deliveryEl = document.getElementById('displayDeliveryDate');
-            if (isRefunded) {
+            if (isRefundVisible) {
                 deliveryEl.innerHTML = '<span class="refund-strikethrough">' + deliveryDate2.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '</span><div class="refund-note">Order Refunded</div>';
                 document.getElementById('deliveryLabel').textContent = 'Estimated Delivery';
                 document.querySelector('.info-item').style.borderLeftColor = '#dc3545';
