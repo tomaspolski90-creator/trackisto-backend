@@ -226,7 +226,7 @@ router.post('/', authenticateToken, async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
       [
         shipment.id,
-        'label_created',
+        'Label Created',
         origin_country || country || 'Processing Center',
         new Date().toISOString().split('T')[0],
         new Date().toTimeString().split(' ')[0],
