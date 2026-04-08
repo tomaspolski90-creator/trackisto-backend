@@ -43,6 +43,7 @@ function App() {
   const [pendingOrders, setPendingOrders] = useState([]);
   const [fulfilledOrders, setFulfilledOrders] = useState([]);
   const [fulfilledPage, setFulfilledPage] = useState(1);
+  const [fulfilledPageSize, setFulfilledPageSize] = useState(50);
   const [fulfilledPagination, setFulfilledPagination] = useState({ totalPages: 1, totalCount: 0 });
   const [pendingLoading, setPendingLoading] = useState(false);
   const [selectedStore, setSelectedStore] = useState('all');
@@ -142,10 +143,10 @@ function App() {
     setPendingLoading(false);
   };
 
-  const fetchFulfilledOrders = async (storeFilter = selectedStore, page = fulfilledPage) => {
+  const fetchFulfilledOrders = async (storeFilter = selectedStore, page = fulfilledPage, limit = fulfilledPageSize) => {
     setPendingLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/shipments?page=${page}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const response = await fetch(`${API_URL}/api/shipments?page=${page}&limit=${limit}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         let orders = data.shipments || [];
@@ -693,10 +694,13 @@ function App() {
             {dashboardTab === 'recent' && (
               <div className="recent-shipments">
                 <table>
-                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                  <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
                   <tbody>
                     {filteredShipments.slice(0, 10).map(s => {
                       const storeInfo = getStoreInfo(s.shopify_store_id);
+                      const deliveryDate = s.created_at && s.delivery_days
+                        ? new Date(new Date(s.created_at).getTime() + s.delivery_days * 24 * 60 * 60 * 1000).toLocaleDateString()
+                        : '-';
                       return (
                         <tr key={s.id}>
                           <td>{s.tracking_number}</td>
@@ -709,11 +713,12 @@ function App() {
                           </td>
                           <td><span className={`status ${s.status}`}>{s.status}</span></td>
                           <td>{new Date(s.created_at).toLocaleDateString()}</td>
+                          <td>{deliveryDate}</td>
                           <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
                         </tr>
                       );
                     })}
-                    {filteredShipments.length === 0 && (<tr><td colSpan="7" className="no-data">No shipments found</td></tr>)}
+                    {filteredShipments.length === 0 && (<tr><td colSpan="8" className="no-data">No shipments found</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -777,10 +782,13 @@ function App() {
               <div className="pending-shipments">
                 {pendingLoading ? (<div className="loading-state">Loading fulfilled orders...</div>) : (
                   <table>
-                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                    <thead><tr><th>TRACKING #</th><th>CUSTOMER</th><th>COUNTRY</th><th>STORE</th><th>STATUS</th><th>CREATED</th><th>DELIVERY DATE</th><th>ACTIONS</th></tr></thead>
                     <tbody>
                       {filteredFulfilledOrders.map(order => {
                         const storeInfo = getStoreInfo(order.shopify_store_id);
+                        const deliveryDate = order.created_at && order.delivery_days
+                          ? new Date(new Date(order.created_at).getTime() + order.delivery_days * 24 * 60 * 60 * 1000).toLocaleDateString()
+                          : '-';
                         return (
                           <tr key={order.id}>
                             <td>{order.tracking_number || '-'}</td>
@@ -793,30 +801,46 @@ function App() {
                             </td>
                             <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
                             <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                            <td>{deliveryDate}</td>
                             <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
                           </tr>
                         );
                       })}
-                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="7" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
+                      {filteredFulfilledOrders.length === 0 && (<tr><td colSpan="8" className="no-data">{searchQuery ? 'No results found' : 'No fulfilled orders found. Click "Refresh" to load.'}</td></tr>)}
                     </tbody>
                   </table>
                 )}
                 <div className="pending-info"><p>Fulfilled Shipments ({fulfilledPagination.totalCount} results)</p>
-                  {fulfilledPagination.totalPages > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                      <button
-                        className="btn-small"
-                        onClick={() => { const p = fulfilledPage - 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
-                        disabled={fulfilledPage <= 1}
-                      >← Previous</button>
-                      <span style={{ fontSize: '14px', color: '#555' }}>Page {fulfilledPage} of {fulfilledPagination.totalPages}</span>
-                      <button
-                        className="btn-small"
-                        onClick={() => { const p = fulfilledPage + 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
-                        disabled={fulfilledPage >= fulfilledPagination.totalPages}
-                      >Next →</button>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                    {fulfilledPagination.totalPages > 1 && (
+                      <>
+                        <button
+                          className="btn-small"
+                          onClick={() => { const p = fulfilledPage - 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
+                          disabled={fulfilledPage <= 1}
+                        >← Previous</button>
+                        <span style={{ fontSize: '14px', color: '#555' }}>Page {fulfilledPage} of {fulfilledPagination.totalPages}</span>
+                        <button
+                          className="btn-small"
+                          onClick={() => { const p = fulfilledPage + 1; setFulfilledPage(p); fetchFulfilledOrders(selectedStore, p); }}
+                          disabled={fulfilledPage >= fulfilledPagination.totalPages}
+                        >Next →</button>
+                      </>
+                    )}
+                    <span style={{ fontSize: '14px', color: '#555', marginLeft: '12px' }}>Show</span>
+                    <select
+                      value={fulfilledPageSize}
+                      onChange={(e) => { const size = parseInt(e.target.value); setFulfilledPageSize(size); setFulfilledPage(1); fetchFulfilledOrders(selectedStore, 1, size); }}
+                      style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ddd', fontSize: '14px' }}
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={250}>250</option>
+                      <option value={500}>500</option>
+                    </select>
+                    <span style={{ fontSize: '14px', color: '#555' }}>per page</span>
+                  </div>
                 </div>
               </div>
             )}
