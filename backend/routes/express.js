@@ -270,7 +270,14 @@ async function processExpressShipment(shipment) {
     const e = events[i];
     if (created.find(c => c.priority === e.priority)) continue;
 
-    const scheduledDay = Math.floor(dayStep * e.mult);
+    // FORCE delivery events (OFD and Delivered) to land on exactly day deliveryDays
+    // This ensures delivery happens on the promised day, not earlier
+    let scheduledDay;
+    if (e.priority === 13 || e.priority === 14) {
+      scheduledDay = dd; // Force to deliveryDays
+    } else {
+      scheduledDay = Math.floor(dayStep * e.mult);
+    }
     if (runDay < scheduledDay) break;
 
     const last = created[created.length - 1];
@@ -279,7 +286,19 @@ async function processExpressShipment(shipment) {
     const lastTotal = last.day * 24 * 60 + last.hour * 60 + last.min;
     let day, hour, min;
 
-    if (e.tight) {
+    if (e.priority === 13) {
+      // Out for Express Delivery: force to day deliveryDays, morning
+      day = dd;
+      hour = 7 + Math.floor(Math.random() * 4); // 7-11
+      min = Math.floor(Math.random() * 60);
+    } else if (e.priority === 14) {
+      // Express Delivered: force to day deliveryDays, after OFD
+      day = dd;
+      const ofdHour = last.hour;
+      hour = ofdHour + 2 + Math.floor(Math.random() * 4); // 2-6 hours after OFD
+      if (hour > 18) hour = 18;
+      min = Math.floor(Math.random() * 60);
+    } else if (e.tight) {
       const prevTotalH = last.day * 24 + last.hour;
       const range = (e.maxH || e.minH + 2) - e.minH + 1;
       const offsetH = e.minH + Math.floor(Math.random() * range);
