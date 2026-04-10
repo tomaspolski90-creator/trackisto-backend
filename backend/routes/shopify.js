@@ -845,7 +845,9 @@ async function updateShipmentEvents(shipment) {
       minHoursFromPrev: 6, timeMin: 5, timeMax: 16, minDD: 10
     },
     {
-      day: Math.round(dayStep * 17),
+      // For WooCommerce damaged: trigger ON delivery date (createdAt + deliveryDays)
+      // For Shopify out-for-delivery: trigger near end of schedule
+      day: isWooCommerce ? deliveryDays : Math.round(dayStep * 17),
       status: isWooCommerce ? 'Shipment Damaged – Inspection Hold' : 'Out for Delivery',
       location: `${destinationCity}, ${destinationCountry}`,
       description: isWooCommerce
@@ -906,9 +908,12 @@ async function updateShipmentEvents(shipment) {
       const eventDate = new Date(createdAt);
       eventDate.setDate(eventDate.getDate() + event.day);
 
+      // Damaged events: skip date-push logic so they stay on the delivery date exactly
+      const isDamagedEvent = event.status && event.status.includes('Damaged');
+
       // If the previous event + minimum transit hours requires a later date, push this event forward
       // This prevents unrealistic gaps (e.g. Netherlands at 17:00 → France at 18:00 same day)
-      if (prevEventTimestamp) {
+      if (prevEventTimestamp && !isDamagedEvent) {
         const earliestTimestamp = new Date(prevEventTimestamp.getTime() + (event.minHoursFromPrev || 2) * 60 * 60 * 1000);
         if (earliestTimestamp > eventDate) {
           const pushedDate = new Date(earliestTimestamp);
