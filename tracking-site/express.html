@@ -336,7 +336,7 @@
                 </div>
             </div>
             <div class="info-grid">
-                <div class="info-item"><div class="info-label" id="deliveryLabel">Estimated Delivery</div><div class="info-value" id="displayDeliveryDate">-</div><div id="easterNotice" style="display:none; margin-top:10px; padding-top:10px; border-top:0.5px solid rgba(0,0,0,0.08); display:none; align-items:flex-start; gap:8px;"><svg style="width:14px;height:14px;flex-shrink:0;margin-top:2px;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#B4B2A9"/><line x1="8" y1="5" x2="8" y2="8.5" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="10.5" r="0.75" fill="#888780"/></svg><span style="font-size:12px;color:#888;line-height:1.6;">Due to high order volume and reduced staffing during the Easter period, your delivery has been slightly delayed. We sincerely apologize for any inconvenience and thank you for your patience.</span></div></div>
+                <div class="info-item"><div class="info-label" id="deliveryLabel">Delivery Date</div><div class="info-value" id="displayDeliveryDate">-</div></div>
                 <div class="info-item"><div class="info-label">Destination</div><div class="info-value" id="displayDestination">-</div></div>
                 <div class="info-item"><div class="info-label">Recipient</div><div class="info-value" id="displayRecipient">-</div></div>
             </div>
@@ -491,23 +491,34 @@
             dot4Label.classList.remove('warning-label');
             dots[3].innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
-            if (status === 'label_created') { 
-                progress = 8; 
+            // Express statuses
+            if (status === 'order_confirmed' || status === 'label_created') {
+                progress = 8;
                 completedDots = 1;
                 activeDot = -1;
             }
-            else if (status === 'in_transit') { 
-                progress = 40; 
+            else if (status === 'picked_up' || status === 'at_origin_airport') {
+                progress = 20;
+                completedDots = 1;
+                activeDot = -1;
+            }
+            else if (status === 'in_transit') {
+                progress = 40;
                 completedDots = 1;
                 activeDot = 1;
             }
-            else if (status === 'out_for_delivery') { 
-                progress = 70; 
+            else if (status === 'customs') {
+                progress = 55;
+                completedDots = 2;
+                activeDot = -1;
+            }
+            else if (status === 'out_for_delivery') {
+                progress = 75;
                 completedDots = 2;
                 activeDot = 2;
             }
-            else if (status === 'delivered') { 
-                progress = 100; 
+            else if (status === 'delivered') {
+                progress = 100;
                 completedDots = 4;
                 activeDot = -1;
             }
