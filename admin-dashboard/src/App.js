@@ -57,6 +57,41 @@ function App() {
   const [generatedTracking, setGeneratedTracking] = useState(null);
   const [selectedOrders, setSelectedOrders] = useState([]);
 
+  // Express Shipping state
+  const [expressForm, setExpressForm] = useState({
+    customer_name: '', customer_email: '', shipping_address: '',
+    city: '', state: '', zip_code: '',
+    destination_country: '', origin_country: '', delivery_days: 7
+  });
+  const [expressGenerated, setExpressGenerated] = useState(null);
+  const [expressLoading, setExpressLoading] = useState(false);
+
+  const handleCreateExpress = async (e) => {
+    e.preventDefault();
+    setExpressLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/express/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(expressForm)
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setExpressGenerated(data);
+        setExpressForm({
+          customer_name: '', customer_email: '', shipping_address: '',
+          city: '', state: '', zip_code: '',
+          destination_country: '', origin_country: '', delivery_days: 7
+        });
+      } else {
+        alert('Error: ' + (data.error || 'Failed to create express shipment'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+    setExpressLoading(false);
+  };
+
   const navigateTo = (page) => {
     setCurrentPage(page);
     window.location.hash = page;
@@ -638,6 +673,7 @@ function App() {
         <ul className="nav-menu">
           <li className={currentPage === 'dashboard' ? 'active' : ''} onClick={() => navigateTo('dashboard')}>📊 Dashboard</li>
           <li className={currentPage === 'shipments' ? 'active' : ''} onClick={() => navigateTo('shipments')}>📦 Manual Entry</li>
+          <li className={currentPage === 'express' ? 'active' : ''} onClick={() => navigateTo('express')} style={{background: currentPage === 'express' ? 'linear-gradient(135deg, #f59e0b 0%, #d4af37 100%)' : ''}}>✈ Express Shipping</li>
           <li className={currentPage === 'missing' ? 'active' : ''} onClick={() => navigateTo('missing')}>⏳ Missing Entries</li>
           <li className={currentPage === 'shopify' ? 'active' : ''} onClick={() => navigateTo('shopify')}>🛒 Shopify Settings</li>
           <li className={currentPage === 'wordpress' ? 'active' : ''} onClick={() => navigateTo('wordpress')}>🌐 WordPress Settings</li>
@@ -1123,6 +1159,105 @@ function App() {
                 </div>
 
                 <button type="submit" className="btn-generate" disabled={loading}>{loading ? 'Generating...' : 'Generate Tracking'}</button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'express' && (
+          <div className="shipments">
+            <h1 style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'48px',height:'48px',background:'linear-gradient(135deg,#f59e0b 0%,#d4af37 100%)',borderRadius:'12px',color:'white',fontSize:'24px',boxShadow:'0 4px 12px rgba(245,158,11,0.3)'}}>✈</span>
+              Express Shipping
+            </h1>
+            <p style={{color:'#666',marginBottom:'24px'}}>Premium priority air delivery — 2 to 10 days direct flight</p>
+
+            {expressGenerated && (
+              <div style={{background:'linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)',border:'2px solid #f59e0b',borderRadius:'12px',padding:'20px',marginBottom:'24px'}}>
+                <h3 style={{color:'#92400e',marginBottom:'12px'}}>✈ Express Shipment Created!</h3>
+                <p><strong>Tracking Number:</strong> <code style={{background:'#fff',padding:'4px 8px',borderRadius:'4px',color:'#0d234b'}}>{expressGenerated.tracking_number}</code></p>
+                <p><strong>Customer:</strong> {expressGenerated.shipment.customer_name}</p>
+                <p><strong>Route:</strong> {expressGenerated.shipment.origin_country} → {expressGenerated.shipment.destination_country}</p>
+                <p><strong>Delivery Days:</strong> {expressGenerated.shipment.delivery_days} days</p>
+                <button className="btn-small" style={{marginTop:'12px',background:'#f59e0b',color:'white',border:'none',padding:'8px 16px',borderRadius:'6px',cursor:'pointer'}} onClick={() => setExpressGenerated(null)}>Create another</button>
+              </div>
+            )}
+
+            <div className="form-container" style={{borderLeft:'4px solid #f59e0b'}}>
+              <div style={{background:'linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%)',borderLeft:'4px solid #f59e0b',padding:'16px 20px',borderRadius:'8px',marginBottom:'24px'}}>
+                <p style={{fontSize:'13px',color:'#78350f',margin:'4px 0'}}><strong>Express Air Service:</strong> Direct flight delivery with priority handling</p>
+                <p style={{fontSize:'13px',color:'#78350f',margin:'4px 0'}}><strong>Tracking events:</strong> 7-14 events scaling with delivery time (no future timestamps)</p>
+                <p style={{fontSize:'13px',color:'#78350f',margin:'4px 0'}}><strong>Order Confirmed:</strong> Created at the exact moment you submit this form</p>
+              </div>
+
+              <form onSubmit={handleCreateExpress}>
+                <h3 style={{color:'#29ABE2',marginBottom:'14px',paddingBottom:'8px',borderBottom:'1px solid #e5e7eb'}}>Customer Details</h3>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" required value={expressForm.customer_name} onChange={(e) => setExpressForm({...expressForm, customer_name: e.target.value})} placeholder="Marie Dubois" />
+                  </div>
+                  <div className="form-group">
+                    <label>Email Address</label>
+                    <input type="email" value={expressForm.customer_email} onChange={(e) => setExpressForm({...expressForm, customer_email: e.target.value})} placeholder="customer@example.com" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Shipping Address</label>
+                  <textarea rows="2" value={expressForm.shipping_address} onChange={(e) => setExpressForm({...expressForm, shipping_address: e.target.value})} placeholder="42 Avenue Victor Hugo" />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>City</label>
+                    <input type="text" value={expressForm.city} onChange={(e) => setExpressForm({...expressForm, city: e.target.value})} placeholder="Paris" />
+                  </div>
+                  <div className="form-group">
+                    <label>State / Region</label>
+                    <input type="text" value={expressForm.state} onChange={(e) => setExpressForm({...expressForm, state: e.target.value})} placeholder="Île-de-France" />
+                  </div>
+                  <div className="form-group">
+                    <label>ZIP / Postal Code</label>
+                    <input type="text" value={expressForm.zip_code} onChange={(e) => setExpressForm({...expressForm, zip_code: e.target.value})} placeholder="75008" />
+                  </div>
+                </div>
+
+                <h3 style={{color:'#29ABE2',marginTop:'24px',marginBottom:'14px',paddingBottom:'8px',borderBottom:'1px solid #e5e7eb'}}>Express Delivery Info</h3>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Country of Origin *</label>
+                    <select required value={expressForm.origin_country} onChange={(e) => setExpressForm({...expressForm, origin_country: e.target.value})}>
+                      <option value="">Select Country...</option>
+                      <option>United Kingdom</option><option>Germany</option><option>France</option><option>Netherlands</option><option>Belgium</option><option>Denmark</option><option>Sweden</option><option>Norway</option><option>Finland</option><option>Spain</option><option>Portugal</option><option>Italy</option><option>Austria</option><option>Switzerland</option><option>Poland</option><option>Czech Republic</option><option>Hungary</option><option>Romania</option><option>Greece</option><option>Ireland</option><option>United States</option><option>Canada</option><option>Australia</option><option>Japan</option><option>China</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Destination Country *</label>
+                    <select required value={expressForm.destination_country} onChange={(e) => setExpressForm({...expressForm, destination_country: e.target.value})}>
+                      <option value="">Select Country...</option>
+                      <option>United Kingdom</option><option>Germany</option><option>France</option><option>Netherlands</option><option>Belgium</option><option>Denmark</option><option>Sweden</option><option>Norway</option><option>Finland</option><option>Spain</option><option>Portugal</option><option>Italy</option><option>Austria</option><option>Switzerland</option><option>Poland</option><option>Czech Republic</option><option>Hungary</option><option>Romania</option><option>Greece</option><option>Ireland</option><option>United States</option><option>Canada</option><option>Australia</option><option>Japan</option><option>China</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Express Delivery Days *</label>
+                    <select required value={expressForm.delivery_days} onChange={(e) => setExpressForm({...expressForm, delivery_days: parseInt(e.target.value)})}>
+                      <option value={2}>2 days (Premium Express)</option>
+                      <option value={3}>3 days</option>
+                      <option value={4}>4 days</option>
+                      <option value={5}>5 days</option>
+                      <option value={6}>6 days</option>
+                      <option value={7}>7 days</option>
+                      <option value={8}>8 days</option>
+                      <option value={9}>9 days</option>
+                      <option value={10}>10 days</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={expressLoading} style={{width:'100%',padding:'16px',background:'linear-gradient(135deg,#f59e0b 0%,#d4af37 100%)',color:'white',border:'none',borderRadius:'8px',fontSize:'16px',fontWeight:'700',cursor:'pointer',boxShadow:'0 4px 12px rgba(245,158,11,0.3)',marginTop:'20px',letterSpacing:'0.5px'}}>
+                  {expressLoading ? 'Creating Express Shipment...' : '✈ GENERATE EXPRESS TRACKING'}
+                </button>
               </form>
             </div>
           </div>
