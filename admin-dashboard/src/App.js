@@ -1179,7 +1179,11 @@ function App() {
                 <p><strong>Customer:</strong> {expressGenerated.shipment.customer_name}</p>
                 <p><strong>Route:</strong> {expressGenerated.shipment.origin_country} → {expressGenerated.shipment.destination_country}</p>
                 <p><strong>Delivery Days:</strong> {expressGenerated.shipment.delivery_days} days</p>
-                <button className="btn-small" style={{marginTop:'12px',background:'#f59e0b',color:'white',border:'none',padding:'8px 16px',borderRadius:'6px',cursor:'pointer'}} onClick={() => setExpressGenerated(null)}>Create another</button>
+                <p><strong>Customer Tracking Link:</strong> <a href={`https://rvslogistics.com/express.html?tracking=${expressGenerated.tracking_number}`} target="_blank" rel="noopener noreferrer" style={{color:'#0d234b',fontWeight:'600'}}>{`https://rvslogistics.com/express.html?tracking=${expressGenerated.tracking_number}`}</a></p>
+                <div style={{marginTop:'12px',display:'flex',gap:'8px'}}>
+                  <button className="btn-small" style={{background:'#29ABE2',color:'white',border:'none',padding:'8px 16px',borderRadius:'6px',cursor:'pointer'}} onClick={() => navigator.clipboard.writeText(`https://rvslogistics.com/express.html?tracking=${expressGenerated.tracking_number}`)}>Copy Link</button>
+                  <button className="btn-small" style={{background:'#f59e0b',color:'white',border:'none',padding:'8px 16px',borderRadius:'6px',cursor:'pointer'}} onClick={() => setExpressGenerated(null)}>Create another</button>
+                </div>
               </div>
             )}
 
