@@ -335,12 +335,17 @@ async function processExpressShipment(shipment) {
     created.push({ priority: e.priority, day, hour, min });
   }
 
-  // Update shipment status if delivered
+  // Update shipment status based on highest priority event
   const lastCreated = created[created.length - 1];
-  if (lastCreated && lastCreated.priority === 14) {
-    await db.query("UPDATE express_shipments SET status = 'delivered', updated_at = NOW() WHERE id = $1", [shipment.id]);
-  } else if (created.length > 1) {
-    await db.query("UPDATE express_shipments SET status = 'in_transit', updated_at = NOW() WHERE id = $1 AND status != 'delivered'", [shipment.id]);
+  if (lastCreated) {
+    let newStatus = 'order_confirmed';
+    if (lastCreated.priority === 14) newStatus = 'delivered';
+    else if (lastCreated.priority === 13) newStatus = 'out_for_delivery';
+    else if (lastCreated.priority >= 8) newStatus = 'customs';
+    else if (lastCreated.priority >= 6) newStatus = 'in_transit';
+    else if (lastCreated.priority >= 4) newStatus = 'at_origin_airport';
+    else if (lastCreated.priority >= 2) newStatus = 'picked_up';
+    await db.query("UPDATE express_shipments SET status = $1, updated_at = NOW() WHERE id = $2", [newStatus, shipment.id]);
   }
 }
 
@@ -395,7 +400,7 @@ router.post('/create', authenticateToken, async (req, res) => {
       [
         trackingNumber, customer_name, customer_email || '', shipping_address || '',
         city || '', state || '', zip_code || '', destination_country,
-        origin_country, dd, estimatedDelivery, 'in_transit'
+        origin_country, dd, estimatedDelivery, 'order_confirmed'
       ]
     );
 
