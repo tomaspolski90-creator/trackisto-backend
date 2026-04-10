@@ -65,6 +65,22 @@ function App() {
   });
   const [expressGenerated, setExpressGenerated] = useState(null);
   const [expressLoading, setExpressLoading] = useState(false);
+  const [expressShipments, setExpressShipments] = useState([]);
+  const [expressShipmentsLoading, setExpressShipmentsLoading] = useState(false);
+
+  const fetchExpressShipments = async () => {
+    setExpressShipmentsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/express/shipments?limit=500`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setExpressShipments(data.shipments || []);
+      }
+    } catch (err) { console.error('Error fetching express shipments:', err); }
+    setExpressShipmentsLoading(false);
+  };
 
   const handleCreateExpress = async (e) => {
     e.preventDefault();
@@ -83,6 +99,7 @@ function App() {
           city: '', state: '', zip_code: '',
           destination_country: '', origin_country: '', delivery_days: 7
         });
+        fetchExpressShipments();
       } else {
         alert('Error: ' + (data.error || 'Failed to create express shipment'));
       }
@@ -698,6 +715,7 @@ function App() {
               <button className={`tab-btn ${dashboardTab === 'recent' ? 'active' : ''}`} onClick={() => setDashboardTab('recent')}>Recent Shipments</button>
               <button className={`tab-btn ${dashboardTab === 'pending' ? 'active' : ''}`} onClick={() => { setDashboardTab('pending'); if (pendingOrders.length === 0) fetchPendingOrders(); }}>Pending Shipments</button>
               <button className={`tab-btn ${dashboardTab === 'fulfilled' ? 'active' : ''}`} onClick={() => { setDashboardTab('fulfilled'); if (fulfilledOrders.length === 0) fetchFulfilledOrders(); }}>Fulfilled Shipments</button>
+              <button className={`tab-btn ${dashboardTab === 'express' ? 'active' : ''}`} onClick={() => { setDashboardTab('express'); if (expressShipments.length === 0) fetchExpressShipments(); }} style={dashboardTab === 'express' ? {background:'linear-gradient(135deg,#f59e0b 0%,#d4af37 100%)',color:'white',border:'none'} : {}}>✈ Express Shipments</button>
               
               <div className="store-filter">
                 <select value={selectedStore} onChange={(e) => handleStoreFilterChange(e.target.value)}>
@@ -879,6 +897,54 @@ function App() {
                     </select>
                     <span style={{ fontSize: '14px', color: '#555' }}>per page</span>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {dashboardTab === 'express' && (
+              <div className="pending-shipments">
+                {expressShipmentsLoading ? (
+                  <div className="loading-state">Loading express shipments...</div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>TRACKING #</th>
+                        <th>CUSTOMER</th>
+                        <th>ROUTE</th>
+                        <th>DELIVERY DAYS</th>
+                        <th>STATUS</th>
+                        <th>CREATED</th>
+                        <th>DELIVERY DATE</th>
+                        <th>ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expressShipments.map(s => {
+                        const deliveryDate = s.created_at && s.delivery_days
+                          ? new Date(new Date(s.created_at).getTime() + s.delivery_days * 24 * 60 * 60 * 1000).toLocaleDateString()
+                          : '-';
+                        return (
+                          <tr key={s.id} style={{background:'linear-gradient(90deg, #fffbeb 0%, #fff 30%)'}}>
+                            <td style={{fontFamily:'monospace',fontSize:'13px'}}>{s.tracking_number}</td>
+                            <td>{s.customer_name}</td>
+                            <td><span style={{fontSize:'13px'}}>{s.origin_country} → {s.destination_country}</span></td>
+                            <td><span style={{display:'inline-flex',alignItems:'center',gap:'4px',background:'linear-gradient(135deg,#f59e0b 0%,#d4af37 100%)',color:'white',padding:'4px 10px',borderRadius:'12px',fontSize:'11px',fontWeight:'700'}}>✈ {s.delivery_days} DAYS</span></td>
+                            <td><span className={`status ${s.status || 'in_transit'}`}>{s.status || 'in_transit'}</span></td>
+                            <td>{new Date(s.created_at).toLocaleDateString()}</td>
+                            <td><strong>{deliveryDate}</strong></td>
+                            <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/express.html?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
+                          </tr>
+                        );
+                      })}
+                      {expressShipments.length === 0 && (
+                        <tr><td colSpan="8" className="no-data">No express shipments yet. Create one from the Express Shipping menu.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+                <div className="pending-info">
+                  <p>Express Shipments ({expressShipments.length} results)</p>
                 </div>
               </div>
             )}
