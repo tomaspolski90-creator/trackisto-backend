@@ -16,6 +16,7 @@ const shopifyRoutes = require('./routes/shopify');
 const contactRoutes = require('./routes/contact');
 const woocommerceRoutes = require('./routes/woocommerce');
 const expressRoutes = require('./routes/express');
+const refundRoutes = require('./routes/refund');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', shipmentRoutes);
@@ -24,6 +25,7 @@ app.use('/api/shopify', shopifyRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/woocommerce', woocommerceRoutes);
 app.use('/api/express', expressRoutes);
+app.use('/api/refund', refundRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
