@@ -418,12 +418,29 @@
             const deliveryDate = new Date(data.delivery.estimatedDate);
             const today = new Date(); today.setHours(0,0,0,0); deliveryDate.setHours(0,0,0,0);
 
-            // Refund override for FR1775548446546411
-            const refundTracking = 'FR1775548446546411';
-            const refundTime = new Date('2026-04-08T15:30:00+02:00');
+            // Refund orders - supports multiple tracking numbers
+            const refundOrders = {
+                'FR1775548446546411': {
+                    refundTime: new Date('2026-04-08T15:30:00+02:00'),
+                    refundDisplayDate: '08/04/2026',
+                    refundDisplayTime: '15:30',
+                    returnTime: new Date('2026-04-09T10:04:00+02:00'),
+                    returnDisplayDate: '09/04/2026',
+                    returnDisplayTime: '10:04'
+                },
+                'FR1774429901892402': {
+                    refundTime: new Date('2026-04-13T15:30:00+02:00'),
+                    refundDisplayDate: '13/04/2026',
+                    refundDisplayTime: '15:30',
+                    returnTime: new Date('2026-04-14T10:04:00+02:00'),
+                    returnDisplayDate: '14/04/2026',
+                    returnDisplayTime: '10:04'
+                }
+            };
             const now = new Date();
-            const isRefundedOrder = data.trackingNumber === refundTracking;
-            const isRefundVisible = isRefundedOrder && now >= refundTime;
+            const refundData = refundOrders[data.trackingNumber];
+            const isRefundedOrder = !!refundData;
+            const isRefundVisible = isRefundedOrder && now >= refundData.refundTime;
 
             const showException = !isRefundedOrder && data.status === 'exception' && today >= deliveryDate;
             let displayedStatus = showException ? 'exception' : (data.status === 'exception' ? 'in_transit' : data.status);
@@ -450,22 +467,19 @@
             const timelineContainer = document.getElementById('timelineContainer');
             timelineContainer.innerHTML = '';
 
-            // Inject refund events for FR1775548446546411 based on time
-            if (data.trackingNumber === refundTracking) {
-                const now = new Date();
-                const returnTime = new Date('2026-04-09T10:04:00+02:00');
-
-                if (now >= returnTime) {
+            // Inject refund events based on time (works for any refunded order)
+            if (isRefundedOrder) {
+                if (now >= refundData.returnTime) {
                     const returnItem = document.createElement('div');
                     returnItem.className = 'timeline-item return-item';
-                    returnItem.innerHTML = '<div class="timeline-dot"><svg viewBox="0 0 24 24"><path d="M18 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM19.5 9.5L21.46 12H17V9.5h2.5zM6 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg></div><div class="timeline-content"><div class="timeline-status">Return to Sender Initiated</div><div class="timeline-location">élansports.fr — Orneta Commerce Ltd</div><div class="timeline-time">09/04/2026 at 10:04</div><div style="font-size:13px;color:#666;margin-top:8px;line-height:1.5;">Shipment has been marked for return. The package will be routed back to élansports.fr — Orneta Commerce Ltd.</div></div>';
+                    returnItem.innerHTML = '<div class="timeline-dot"><svg viewBox="0 0 24 24"><path d="M18 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM19.5 9.5L21.46 12H17V9.5h2.5zM6 18.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5zM20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"/></svg></div><div class="timeline-content"><div class="timeline-status">Return to Sender Initiated</div><div class="timeline-location">élansports.fr — Orneta Commerce Ltd</div><div class="timeline-time">' + refundData.returnDisplayDate + ' at ' + refundData.returnDisplayTime + '</div><div style="font-size:13px;color:#666;margin-top:8px;line-height:1.5;">Shipment has been marked for return. The package will be routed back to élansports.fr — Orneta Commerce Ltd.</div></div>';
                     timelineContainer.appendChild(returnItem);
                 }
 
-                if (now >= refundTime) {
+                if (isRefundVisible) {
                     const refundItem = document.createElement('div');
                     refundItem.className = 'timeline-item refund-item';
-                    refundItem.innerHTML = '<div class="timeline-dot"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></div><div class="timeline-content"><div class="timeline-status">Order Refunded</div><div class="timeline-location">RVS Logistics — élansports.fr</div><div class="timeline-time">08/04/2026 at 15:30</div><div style="font-size:13px;color:#666;margin-top:8px;line-height:1.5;">A refund has been issued by élansports.fr. RVS Logistics has been notified and the shipment has been cancelled.</div></div>';
+                    refundItem.innerHTML = '<div class="timeline-dot"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg></div><div class="timeline-content"><div class="timeline-status">Order Refunded</div><div class="timeline-location">RVS Logistics — élansports.fr</div><div class="timeline-time">' + refundData.refundDisplayDate + ' at ' + refundData.refundDisplayTime + '</div><div style="font-size:13px;color:#666;margin-top:8px;line-height:1.5;">A refund has been issued by élansports.fr. RVS Logistics has been notified and the shipment has been cancelled.</div></div>';
                     timelineContainer.appendChild(refundItem);
                 }
             }
