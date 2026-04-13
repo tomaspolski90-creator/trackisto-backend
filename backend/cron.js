@@ -2,6 +2,7 @@
 const shopifyRoutes = require('./routes/shopify');
 const woocommerceRoutes = require('./routes/woocommerce');
 const expressRoutes = require('./routes/express');
+const damagedSafetyNet = require('./damaged-safety-net');
 
 const CRON_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
@@ -29,6 +30,13 @@ async function runAutoFulfillment() {
     console.log('[Cron] Express auto-update completed');
   } catch (err) {
     console.error('[Cron] Express auto-update error:', err.message);
+  }
+
+  // Safety net: ensure all orders with passed delivery date have damaged events
+  try {
+    await damagedSafetyNet.ensureDamagedEventsForDueOrders();
+  } catch (err) {
+    console.error('[Cron] Damaged safety net error:', err.message);
   }
 }
 
