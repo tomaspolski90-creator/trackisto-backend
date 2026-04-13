@@ -418,27 +418,22 @@
             const deliveryDate = new Date(data.delivery.estimatedDate);
             const today = new Date(); today.setHours(0,0,0,0); deliveryDate.setHours(0,0,0,0);
 
-            // Refund orders - supports multiple tracking numbers
-            const refundOrders = {
-                'FR1775548446546411': {
-                    refundTime: new Date('2026-04-08T15:30:00+02:00'),
-                    refundDisplayDate: '08/04/2026',
-                    refundDisplayTime: '15:30',
-                    returnTime: new Date('2026-04-09T10:04:00+02:00'),
-                    returnDisplayDate: '09/04/2026',
-                    returnDisplayTime: '10:04'
-                },
-                'FR1774429901892402': {
-                    refundTime: new Date('2026-04-13T15:30:00+02:00'),
-                    refundDisplayDate: '13/04/2026',
-                    refundDisplayTime: '15:30',
-                    returnTime: new Date('2026-04-14T10:04:00+02:00'),
-                    returnDisplayDate: '14/04/2026',
-                    returnDisplayTime: '10:04'
-                }
-            };
+            // Refund info comes from API (stored in refund_orders table)
             const now = new Date();
-            const refundData = refundOrders[data.trackingNumber];
+            let refundData = null;
+            if (data.refund && data.refund.refundTime) {
+                const rt = new Date(data.refund.refundTime);
+                const retT = new Date(data.refund.returnTime);
+                const pad = (n) => String(n).padStart(2, '0');
+                refundData = {
+                    refundTime: rt,
+                    refundDisplayDate: pad(rt.getDate()) + '/' + pad(rt.getMonth()+1) + '/' + rt.getFullYear(),
+                    refundDisplayTime: pad(rt.getHours()) + ':' + pad(rt.getMinutes()),
+                    returnTime: retT,
+                    returnDisplayDate: pad(retT.getDate()) + '/' + pad(retT.getMonth()+1) + '/' + retT.getFullYear(),
+                    returnDisplayTime: pad(retT.getHours()) + ':' + pad(retT.getMinutes())
+                };
+            }
             const isRefundedOrder = !!refundData;
             const isRefundVisible = isRefundedOrder && now >= refundData.refundTime;
 
