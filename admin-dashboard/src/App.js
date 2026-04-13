@@ -109,6 +109,29 @@ function App() {
     setExpressLoading(false);
   };
 
+  // Refund handler - triggers refund flow with automatic timing
+  const handleRefund = async (trackingNumber, customerName) => {
+    if (!window.confirm(`Start refund flow for ${customerName} (${trackingNumber})?\n\n• "Order Refunded" will show immediately\n• "Return to Sender" will appear tomorrow at 10:04\n\nThe WooCommerce order is NOT changed - this only affects the tracking page.`)) {
+      return;
+    }
+    try {
+      const response = await fetch(`${API_URL}/api/refund/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_number: trackingNumber })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`✓ Refund activated for ${customerName}\n\nTracking URL:\nhttps://rvslogistics.com/?tracking=${trackingNumber}`);
+        fetchFulfilledOrders();
+      } else {
+        alert('Error: ' + (data.error || 'Failed to create refund'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
   const navigateTo = (page) => {
     setCurrentPage(page);
     window.location.hash = page;
@@ -769,7 +792,10 @@ function App() {
                           <td><span className={`status ${s.status}`}>{s.status}</span></td>
                           <td>{new Date(s.created_at).toLocaleDateString()}</td>
                           <td>{deliveryDate}</td>
-                          <td><button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button></td>
+                          <td style={{display:'flex',gap:'4px'}}>
+                            <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${s.tracking_number}`, '_blank')}>View</button>
+                            <button className="btn-small" style={{background:'#dc3545',color:'white',border:'none'}} onClick={() => handleRefund(s.tracking_number, s.customer_name)}>Refund</button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -858,7 +884,14 @@ function App() {
                             <td><span className={`status ${order.status || 'in_transit'}`}>{order.status || 'in_transit'}</span></td>
                             <td>{new Date(order.created_at).toLocaleDateString()}</td>
                             <td>{deliveryDate}</td>
-                            <td>{order.tracking_number ? <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button> : '-'}</td>
+                            <td>
+                              {order.tracking_number ? (
+                                <div style={{display:'flex',gap:'4px'}}>
+                                  <button className="btn-small" onClick={() => window.open(`https://rvslogistics.com/?tracking=${order.tracking_number}`, '_blank')}>View</button>
+                                  <button className="btn-small" style={{background:'#dc3545',color:'white',border:'none'}} onClick={() => handleRefund(order.tracking_number, order.customer_name)}>Refund</button>
+                                </div>
+                              ) : '-'}
+                            </td>
                           </tr>
                         );
                       })}
