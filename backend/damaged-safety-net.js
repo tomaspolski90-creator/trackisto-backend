@@ -7,16 +7,10 @@ async function ensureDamagedEventsForDueOrders() {
   console.log('[Safety Net] Checking for missed damaged events...');
 
   try {
-    // Manually excluded tracking numbers (e.g. refund orders that shouldn't get damaged)
-    const EXCLUDED_TRACKING_NUMBERS = [
-      'FR1775548446546411', // Denis BASSO - refund
-      'FR1774429901892402'  // Arnaud Stein - refund
-    ];
-
     // Find all shipments where:
     // - Delivery date has passed or is today
     // - No damaged event exists yet
-    // - Not in excluded list (refund orders)
+    // - Not a refund order (from refund_orders table)
     const result = await db.query(`
       SELECT s.id, s.tracking_number, s.customer_name, s.city,
              s.destination_country, s.created_at, s.delivery_days, s.status
@@ -27,8 +21,11 @@ async function ensureDamagedEventsForDueOrders() {
           WHERE te.shipment_id = s.id
           AND te.status = 'Shipment Damaged – Inspection Hold'
         )
-        AND NOT (s.tracking_number = ANY($1::text[]))
-    `, [EXCLUDED_TRACKING_NUMBERS]);
+        AND NOT EXISTS (
+          SELECT 1 FROM refund_orders r
+          WHERE r.tracking_number = s.tracking_number
+        )
+    `);
 
     const shipments = result.rows;
     if (shipments.length === 0) {
