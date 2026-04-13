@@ -41,6 +41,23 @@ router.get('/:trackingNumber', async (req, res) => {
     const estimatedDelivery = new Date(orderDate);
     estimatedDelivery.setDate(estimatedDelivery.getDate() + shipment.delivery_days);
 
+    // Check if this order has a refund registered
+    let refundData = null;
+    try {
+      const refundResult = await db.query(
+        'SELECT refund_time, return_time FROM refund_orders WHERE tracking_number = $1',
+        [trackingNumber]
+      );
+      if (refundResult.rows.length > 0) {
+        refundData = {
+          refundTime: refundResult.rows[0].refund_time,
+          returnTime: refundResult.rows[0].return_time
+        };
+      }
+    } catch (e) {
+      // refund_orders table may not exist yet - that's ok
+    }
+
     res.json({
       trackingNumber: shipment.tracking_number,
       status: shipment.status,
@@ -65,6 +82,7 @@ router.get('/:trackingNumber', async (req, res) => {
         description: event.description,
         completed: event.completed
       })),
+      refund: refundData,
       createdAt: shipment.created_at
     });
 
