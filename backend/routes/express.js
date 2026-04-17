@@ -402,8 +402,8 @@ router.post('/create', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const dd = parseInt(delivery_days);
-    if (dd < 2 || dd > 10) {
-      return res.status(400).json({ error: 'Delivery days must be between 2 and 10' });
+    if (dd < 2 || dd > 15) {
+      return res.status(400).json({ error: 'Delivery days must be between 2 and 15' });
     }
 
     const trackingNumber = generateTrackingNumber(destination_country);
