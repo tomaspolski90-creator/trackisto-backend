@@ -407,19 +407,32 @@ router.post('/create', authenticateToken, async (req, res) => {
     }
 
     const trackingNumber = generateTrackingNumber(destination_country);
-    const estimatedDelivery = new Date(Date.now() + dd * 24 * 60 * 60 * 1000);
+
+    // FIX: Anchor created_at at midnight UTC of customer's local date.
+    // The first event's event_date is stored as a DATE (midnight UTC). If
+    // created_at has a time component, cron's dayDiff calculation produces
+    // -1 and breaks event ordering. Anchoring to midnight ensures dayDiff=0.
+    const customerOffsetHours = TIMEZONE_OFFSETS[destination_country] !== undefined
+      ? TIMEZONE_OFFSETS[destination_country]
+      : 2;
+    const _now = new Date();
+    const _nowCustomerMs = _now.getTime() + customerOffsetHours * 60 * 60 * 1000;
+    const customerDateStr = new Date(_nowCustomerMs).toISOString().split('T')[0];
+    const createdAtAnchor = new Date(customerDateStr + 'T00:00:00Z');
+    const estimatedDelivery = new Date(createdAtAnchor.getTime() + dd * 24 * 60 * 60 * 1000);
 
     const result = await db.query(
       `INSERT INTO express_shipments (
         tracking_number, customer_name, customer_email, shipping_address,
         city, state, zip_code, destination_country, origin_country,
         delivery_days, estimated_delivery, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
       RETURNING *`,
       [
         trackingNumber, customer_name, customer_email || '', shipping_address || '',
         city || '', state || '', zip_code || '', destination_country,
-        origin_country, dd, estimatedDelivery, 'order_confirmed'
+        origin_country, dd, estimatedDelivery, 'order_confirmed',
+        createdAtAnchor
       ]
     );
 
