@@ -84,45 +84,64 @@ async function fetchWooCommerceOrders(store, status = 'processing') {
 }
 
 async function updateWooCommerceOrder(store, orderId, trackingNumber, trackingUrl) {
-  try {
-    const url = buildWooCommerceUrl(store, `orders/${orderId}`);
+  const url = buildWooCommerceUrl(store, `orders/${orderId}`);
+  const noteUrl = buildWooCommerceUrl(store, `orders/${orderId}/notes`);
+  const updateBody = JSON.stringify({
+    status: 'completed',
+    meta_data: [
+      { key: '_tracking_number', value: trackingNumber },
+      { key: '_tracking_url', value: trackingUrl }
+    ]
+  });
 
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: getAuthHeaders(store),
-      body: JSON.stringify({
-        status: 'completed',
-        meta_data: [
-          { key: '_tracking_number', value: trackingNumber },
-          { key: '_tracking_url', value: trackingUrl }
-        ]
-      })
-    });
+  // Retry with exponential backoff: 3 attempts, delays 2s / 8s / 20s
+  const delays = [0, 2000, 8000, 20000];
+  let lastError = null;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to update order: ${response.status} - ${errorText}`);
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) {
+      console.log(`[WooCommerce] Retry ${attempt}/${delays.length - 1} for order ${orderId} after ${delays[attempt]}ms`);
+      await new Promise(r => setTimeout(r, delays[attempt]));
     }
 
-    // Parse the response BEFORE making the notes request
-    const orderData = await response.json();
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: getAuthHeaders(store),
+        body: updateBody
+      });
 
-    const noteUrl = buildWooCommerceUrl(store, `orders/${orderId}/notes`);
-    await fetch(noteUrl, {
-      method: 'POST',
-      headers: getAuthHeaders(store),
-      body: JSON.stringify({
-        note: `Order shipped! Tracking number: ${trackingNumber}\nTrack your order: ${trackingUrl}`,
-        customer_note: true
-      })
-    });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`PUT failed: ${response.status} - ${errorText.substring(0, 200)}`);
+      }
 
-    console.log(`[WooCommerce] Updated order ${orderId} with tracking ${trackingNumber}`);
-    return orderData;
-  } catch (error) {
-    console.error(`[WooCommerce] Error updating order ${orderId}:`, error.message);
-    throw error;
+      const orderData = await response.json();
+
+      // Note is best-effort; don't fail the whole update if note POST fails
+      try {
+        await fetch(noteUrl, {
+          method: 'POST',
+          headers: getAuthHeaders(store),
+          body: JSON.stringify({
+            note: `Order shipped! Tracking number: ${trackingNumber}\nTrack your order: ${trackingUrl}`,
+            customer_note: true
+          })
+        });
+      } catch (noteErr) {
+        console.warn(`[WooCommerce] Note POST failed for order ${orderId} (non-fatal): ${noteErr.message}`);
+      }
+
+      console.log(`[WooCommerce] Updated order ${orderId} with tracking ${trackingNumber}${attempt > 0 ? ' (after ' + attempt + ' retries)' : ''}`);
+      return orderData;
+    } catch (error) {
+      lastError = error;
+      console.warn(`[WooCommerce] Attempt ${attempt + 1} failed for order ${orderId}: ${error.message}`);
+    }
   }
+
+  console.error(`[WooCommerce] All retries exhausted for order ${orderId}:`, lastError?.message);
+  throw lastError || new Error('Update failed after retries');
 }
 
 // ============================================
