@@ -309,34 +309,32 @@ router.get('/pending-orders', authMiddleware, async (req, res) => {
     console.log(`[WooCommerce] Found ${stores.length} connected stores`);
     
     let allOrders = [];
-    
+
     // Get all skipped order IDs
-    let skippedOrderIds = [];
+    let skippedOrderIdsSet = new Set();
     try {
       const skippedResult = await db.query("SELECT order_id FROM skipped_orders WHERE store_type = 'woocommerce'");
-      skippedOrderIds = skippedResult.rows.map(r => r.order_id);
+      skippedOrderIdsSet = new Set(skippedResult.rows.map(r => r.order_id));
     } catch (e) { /* table might not exist yet */ }
-    
+
+    // PERF FIX: Pre-fetch ALL existing shipment order IDs in ONE query (was N+1 per order)
+    const shipmentOrderIdsResult = await db.query(
+      "SELECT shopify_order_id FROM shipments WHERE shopify_order_id IS NOT NULL"
+    );
+    const existingShipmentOrderIds = new Set(shipmentOrderIdsResult.rows.map(r => r.shopify_order_id));
+
     for (const store of stores) {
-      // ============================================
-      // FIX 2: Henter OGSÅ completed orders, ikke kun processing
-      // WooCommerce API understøtter kommaseparerede statusser
-      // ============================================
+      // Henter OGSÅ completed orders, ikke kun processing
       const orders = await fetchWooCommerceOrders(store, 'processing,completed');
-      
+
       for (const order of orders) {
+        const orderIdStr = order.id.toString();
         // Skip orders that have been manually skipped
-        if (skippedOrderIds.includes(order.id.toString())) {
+        if (skippedOrderIdsSet.has(orderIdStr)) {
           continue;
         }
-        
-        // Tjek om ordren allerede har et shipment-record i vores DB
-        const existingShipment = await db.query(
-          'SELECT id FROM shipments WHERE shopify_order_id = $1',
-          [order.id.toString()]
-        );
-        
-        const hasShipment = existingShipment.rows.length > 0;
+
+        const hasShipment = existingShipmentOrderIds.has(orderIdStr);
         
         // Map WooCommerce status til Trackisto fulfillment status
         let fulfillmentStatus;
